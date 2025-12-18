@@ -1,6 +1,7 @@
 # gitsec
 
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-orange.svg)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
 A modular Python CLI tool for auditing GitHub security posture at organization and repository level.
 

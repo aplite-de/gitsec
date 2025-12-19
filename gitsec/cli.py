@@ -39,6 +39,9 @@ def security_checks(
     repo: Optional[str] = typer.Option(
         None, help="Repository in 'owner/repo' form (required for repo-level checks)"
     ),
+    branch: Optional[str] = typer.Option(
+        None, help="Branch name to check (only for repo-level checks, defaults to default branch)"
+    ),
     base_url: str = typer.Option("https://api.github.com", help="GitHub API base URL"),
     token: Optional[str] = typer.Option(
         None, "--token", envvar="GITHUB_TOKEN", help="GitHub PAT"
@@ -146,7 +149,7 @@ def security_checks(
                 else:
                     rows = list(config.run_func(client=client, org=org))
             else:
-                rows = list(config.run_func(client=client, repo=repo))
+                rows = list(config.run_func(client=client, repo=repo, branch=branch))
 
             all_findings.extend(rows)
             typer.echo(f"Found {len(rows)} finding(s)")
@@ -491,6 +494,9 @@ def audit_all(
     local_repo: Optional[str] = typer.Option(
         None, "--local-repo", help="Local repository path"
     ),
+    branch: Optional[str] = typer.Option(
+        None, help="Branch name to check (only for single repo audits, defaults to default branch)"
+    ),
     base_url: str = typer.Option("https://api.github.com", help="GitHub API base URL"),
     token: Optional[str] = typer.Option(
         None,
@@ -767,7 +773,7 @@ def audit_all(
                         else:
                             rows = list(config.run_func(client=client, org=org))
                     else:
-                        rows = list(config.run_func(client=client, repo=repo))
+                        rows = list(config.run_func(client=client, repo=repo, branch=branch))
                     security_findings.extend(rows)
                 except Exception:
                     pass

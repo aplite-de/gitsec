@@ -1,10 +1,10 @@
-from typing import Iterable
+from typing import Iterable, Optional
 
 from gitsec.core.github_api import GitHubClient, format_api_error
 from gitsec.models import Finding
 
 
-def run(client: GitHubClient, repo: str, **_) -> Iterable[Finding]:
+def run(client: GitHubClient, repo: str, branch: Optional[str] = None, **_) -> Iterable[Finding]:
     owner, name = repo.split("/", 1)
 
     try:

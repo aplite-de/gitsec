@@ -106,6 +106,9 @@ gitsec audit-all --org myorg
 # Single repository
 gitsec audit-all --repo owner/repo
 
+# Single repository with custom branch
+gitsec audit-all --repo owner/repo --branch develop
+
 # Local repository
 gitsec audit-all --local-repo /path/to/repo
 
@@ -163,6 +166,9 @@ gitsec security-checks all-repo --repo owner/repo
 # Specific checks (can combine multiple)
 gitsec security-checks org-mfa org-sso --org myorg
 gitsec security-checks repo-commit-signing repo-pr-required --repo owner/repo
+
+# Check a specific branch instead of default branch
+gitsec security-checks repo-pr-required --repo owner/repo --branch new-feat
 ```
 
 ## Available Security Check Modules
@@ -179,9 +185,9 @@ gitsec security-checks repo-commit-signing repo-pr-required --repo owner/repo
 - `org-user-access` - Analyze user access patterns and permissions
 
 ### Repository-level
-- `repo-commit-signing` - Check if commit signing is required
-- `repo-pr-required` - Check if PRs are required on default branch
-- `repo-push-protection` - Check if direct pushes to default branch are blocked
+- `repo-commit-signing` - Check if commit signing is required (supports `--branch`)
+- `repo-pr-required` - Check if PRs are required on default branch (supports `--branch`)
+- `repo-push-protection` - Check if direct pushes to default branch are blocked (supports `--branch`)
 - `repo-tag-deletion-protection` - Check if tag deletion is protected
 - `repo-runners-scope` - Audit self-hosted runners scope
 

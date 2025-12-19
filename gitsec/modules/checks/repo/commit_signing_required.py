@@ -1,9 +1,9 @@
-from typing import Iterable
+from typing import Iterable, Optional
 
 from gitsec.core.github_api import GitHubClient, format_api_error
 from gitsec.models import Finding
 
-_QUERY = """
+_DEFAULT_BRANCH_QUERY = """
 query($owner: String!, $name: String!) {
   repository(owner: $owner, name: $name) {
     nameWithOwner
@@ -17,16 +17,44 @@ query($owner: String!, $name: String!) {
 }
 """
 
+_BRANCH_QUERY = """
+query($owner: String!, $name: String!, $branch: String!) {
+  repository(owner: $owner, name: $name) {
+    nameWithOwner
+    ref(qualifiedName: $branch) {
+      name
+      branchProtectionRule {
+        requiresCommitSignatures
+      }
+    }
+  }
+}
+"""
 
-def run(client: GitHubClient, repo: str, **_) -> Iterable[Finding]:
+
+def run(client: GitHubClient, repo: str, branch: Optional[str] = None, **_) -> Iterable[Finding]:
     owner, name = repo.split("/", 1)
 
     try:
-        data = client.graphql(query=_QUERY, variables={"owner": owner, "name": name})
+        if branch:
+            query = _BRANCH_QUERY
+            variables = {"owner": owner, "name": name, "branch": f"refs/heads/{branch}"}
+        else:
+            query = _DEFAULT_BRANCH_QUERY
+            variables = {"owner": owner, "name": name}
+        
+        data = client.graphql(query=query, variables=variables)
         repo_data = (data.get("data") or {}).get("repository") or {}
-        dbr = repo_data.get("defaultBranchRef") or {}
-        branch = dbr.get("name")
-        rule = dbr.get("branchProtectionRule") or {}
+        
+        if branch:
+            ref = repo_data.get("ref") or {}
+            branch_name = branch
+            rule = ref.get("branchProtectionRule") or {}
+        else:
+            dbr = repo_data.get("defaultBranchRef") or {}
+            branch_name = dbr.get("name")
+            rule = dbr.get("branchProtectionRule") or {}
+        
         val = rule.get("requiresCommitSignatures")
 
         entity = repo_data.get("nameWithOwner") or repo
@@ -37,7 +65,7 @@ def run(client: GitHubClient, repo: str, **_) -> Iterable[Finding]:
             yield Finding(
                 check_id="repo-commit-signing",
                 resource=f"repo/{entity}",
-                evidence=f"Commit signing not required on default branch '{branch}'",
+                evidence=f"Commit signing not required on branch '{branch_name}'",
                 notes="Branch protection rule does not enforce commit signatures",
             )
         else:
@@ -45,7 +73,7 @@ def run(client: GitHubClient, repo: str, **_) -> Iterable[Finding]:
                 check_id="repo-commit-signing",
                 resource=f"repo/{entity}",
                 evidence="Cannot determine if commit signing is required",
-                notes="No protection rule on default branch or field not available",
+                notes=f"No protection rule on branch '{branch_name}' or field not available",
             )
     except Exception as e:
         yield Finding(

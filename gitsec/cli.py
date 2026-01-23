@@ -66,7 +66,8 @@ def security_checks(
 
     \b
     Available modules:
-      Org-level: org-mfa, org-sso, org-commit-signing, org-pr-required,
+      Org-level: org-mfa, org-sso, org-members-can-create-repos,
+                 org-default-repo-permission, org-commit-signing, org-pr-required,
                  org-push-protection, org-tag-deletion-protection,
                  org-secrets-scope, org-runners-scope, org-user-access
 
@@ -152,13 +153,16 @@ def security_checks(
                 rows = list(config.run_func(client=client, repo=repo, branch=branch))
 
             all_findings.extend(rows)
-            typer.echo(f"Found {len(rows)} finding(s)")
+            security_count = len([r for r in rows if not r.is_error])
+            typer.echo(f"Found {security_count} finding(s)")
             print_summary(rows)
 
         except Exception as e:
             typer.echo(f"Error running {module_name}: {e}", err=True)
             raise typer.Exit(code=1)
 
+    security_findings_total = len([f for f in all_findings if not f.is_error])
+    
     if all_findings:
         base_name = "security_checks"
         if org:
@@ -170,8 +174,9 @@ def security_checks(
         typer.echo("\nAll checks complete. Results written to:")
         for path in output_paths:
             typer.echo(f"  - {path}")
-    else:
-        typer.echo("\n✓ No findings across all checks")
+    
+    if security_findings_total == 0:
+        typer.secho("\n✓ No security issues found", fg=typer.colors.GREEN, bold=True)
 
 
 @app.command("scan-dependencies")

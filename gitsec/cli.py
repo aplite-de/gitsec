@@ -126,9 +126,10 @@ def security_checks(
 
     all_findings = []
 
+    typer.echo(f"\nRunning {len(modules_to_run)} security check(s)...\n")
+
     for module_name in modules_to_run:
         config = MODULES[module_name]
-        typer.echo(f"\nRunning {module_name}: {config.description}")
 
         if config.scope == "org" and not org:
             typer.echo(
@@ -153,17 +154,22 @@ def security_checks(
                 rows = list(config.run_func(client=client, repo=repo, branch=branch))
 
             all_findings.extend(rows)
-            security_count = len([r for r in rows if not r.is_error])
-            typer.echo(f"Found {security_count} finding(s)")
-            print_summary(rows)
 
         except Exception as e:
             typer.echo(f"Error running {module_name}: {e}", err=True)
             raise typer.Exit(code=1)
 
     security_findings_total = len([f for f in all_findings if not f.is_error])
+    error_count = len([f for f in all_findings if f.is_error])
+    
+    typer.echo(f"Completed {len(modules_to_run)} check(s):")
+    typer.echo(f"  Security findings: {security_findings_total}")
+    if error_count > 0:
+        typer.echo(f"  Errors/warnings: {error_count}")
     
     if all_findings:
+        print_summary(all_findings)
+        
         base_name = "security_checks"
         if org:
             base_name = f"security_checks_{org}"
@@ -171,13 +177,14 @@ def security_checks(
             base_name = f"security_checks_{repo.replace('/', '_')}"
 
         output_paths = write_outputs(all_findings, base_name, output_dir, formats)
-        typer.echo("\nAll checks complete. Results written to:")
+        typer.echo("\nResults written to:")
         for path in output_paths:
             typer.echo(f"  - {path}")
     
-    if security_findings_total == 0:
+    if security_findings_total == 0 and error_count == 0:
         typer.secho("\n✓ No security issues found", fg=typer.colors.GREEN, bold=True)
-
+    elif security_findings_total == 0 and error_count > 0:
+        typer.secho("\n✓ No security issues found (some checks had errors)", fg=typer.colors.YELLOW)
 
 @app.command("scan-dependencies")
 def scan_dependencies(

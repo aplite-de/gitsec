@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
@@ -36,6 +38,7 @@ class GitHubClient:
         api_version: str = "2022-11-28",
         user_agent: str = "git-sec-posture-mgmt/0.1",
         progress_callback: Optional[Callable[[str], None]] = None,
+        enable_cache: bool = True,
     ) -> None:
         if not token:
             raise ValueError("GitHub token is required.")
@@ -46,6 +49,10 @@ class GitHubClient:
         self.api_base, self.graphql_url = self._normalize_bases(self.input_base)
         self._rate_limit_notified = False
         self._progress_callback = progress_callback
+        self._enable_cache = enable_cache
+        self._cache: Dict[str, Any] = {}
+        self._request_count = 0
+        self._cache_hits = 0
 
         self.client = httpx.Client(
             headers={
@@ -98,8 +105,34 @@ class GitHubClient:
                         print("[OK] Resuming operations")
                     self._rate_limit_notified = False
 
+    def _generate_cache_key(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> str:
+        key_parts = [method, endpoint]
+        if params:
+            key_parts.append(json.dumps(params, sort_keys=True))
+        key_string = "|".join(key_parts)
+        return hashlib.md5(key_string.encode()).hexdigest()
+
+    def _generate_graphql_cache_key(self, query: str, variables: Optional[Dict[str, Any]] = None) -> str:
+        key_parts = [query]
+        if variables:
+            key_parts.append(json.dumps(variables, sort_keys=True))
+        key_string = "|".join(key_parts)
+        return hashlib.md5(key_string.encode()).hexdigest()
+
     def get(self, endpoint: str, *, params: Optional[Dict[str, Any]] = None) -> Any:
-        return self.request("GET", endpoint, params=params)
+        cache_key = self._generate_cache_key("GET", endpoint, params)
+        
+        if self._enable_cache and cache_key in self._cache:
+            self._cache_hits += 1
+            return self._cache[cache_key]
+
+        result = self.request("GET", endpoint, params=params)
+        self._request_count += 1
+        
+        if self._enable_cache:
+            self._cache[cache_key] = result
+
+        return result
 
     def request(
         self,
@@ -184,11 +217,18 @@ class GitHubClient:
     def graphql(
         self, *, query: str, variables: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        cache_key = self._generate_graphql_cache_key(query, variables)
+        
+        if self._enable_cache and cache_key in self._cache:
+            self._cache_hits += 1
+            return self._cache[cache_key]
+
         resp = self.client.post(
             self.graphql_url, json={"query": query, "variables": variables or {}}
         )
 
         self._check_rate_limit(resp)
+        self._request_count += 1
 
         try:
             resp.raise_for_status()
@@ -199,6 +239,10 @@ class GitHubClient:
         errors = data.get("errors")
         if errors:
             raise GitHubAPIError(errors[0].get("message", "GraphQL error"))
+        
+        if self._enable_cache:
+            self._cache[cache_key] = data
+        
         return data
 
     @staticmethod

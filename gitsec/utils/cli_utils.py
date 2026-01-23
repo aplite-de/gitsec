@@ -50,27 +50,40 @@ def write_results_to_csv(rows: List[Finding], output_path: str) -> None:
 
 def print_summary(rows: List[Finding]) -> None:
     if not rows:
-        typer.echo("✓ No issues found")
         return
 
-    typer.echo(f"Found {len(rows)} security issue(s):")
+    errors = [f for f in rows if f.is_error]
+    security_findings = [f for f in rows if not f.is_error]
 
-    for finding in rows[:5]:
-        severity_color = {
-            "Critical": typer.colors.RED,
-            "High": typer.colors.RED,
-            "Medium": typer.colors.YELLOW,
-            "Low": typer.colors.WHITE,
-        }.get(finding.severity or "", typer.colors.WHITE)
+    if security_findings:
+        typer.echo(f"\nFound {len(security_findings)} security issue(s):")
+        for finding in security_findings[:5]:
+            severity_color = {
+                "Critical": typer.colors.RED,
+                "High": typer.colors.RED,
+                "Medium": typer.colors.YELLOW,
+                "Low": typer.colors.WHITE,
+            }.get(finding.severity or "", typer.colors.WHITE)
 
-        typer.secho(
-            f"  [{finding.severity}] {finding.title}",
-            fg=severity_color,
-            bold=(finding.severity in ["Critical", "High"]),
-        )
+            typer.secho(
+                f"  [{finding.severity}] {finding.title}",
+                fg=severity_color,
+                bold=(finding.severity in ["Critical", "High"]),
+            )
 
-    if len(rows) > 5:
-        typer.echo(f"  ... and {len(rows) - 5} more")
+        if len(security_findings) > 5:
+            typer.echo(f"  ... and {len(security_findings) - 5} more")
+
+    if errors:
+        typer.echo(f"\nFound {len(errors)} error(s):")
+        for error in errors[:5]:
+            error_msg = error.evidence
+            if error.notes:
+                error_msg += f": {error.notes}"
+            typer.secho(f"  ⚠ {error_msg}", fg=typer.colors.YELLOW)
+
+        if len(errors) > 5:
+            typer.echo(f"  ... and {len(errors) - 5} more")
 
 
 def write_outputs(

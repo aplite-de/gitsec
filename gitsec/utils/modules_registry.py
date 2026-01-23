@@ -1,6 +1,12 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from ..modules.checks.org.default_repository_permission import (
+    run as default_repo_permission_run,
+)
+from ..modules.checks.org.members_can_create_repositories import (
+    run as members_can_create_repos_run,
+)
 from ..modules.checks.org.mfa_required import run as mfa_run
 from ..modules.checks.org.repo_commit_signing_required import (
     run as org_commit_signing_run,
@@ -46,6 +52,20 @@ MODULES = {
         description="Check if organization has SSO/SAML enabled",
         run_func=sso_run,
         output_file="org_sso_enabled.csv",
+        scope="org",
+    ),
+    "org-members-can-create-repos": ModuleConfig(
+        name="org-members-can-create-repos",
+        description="Check if organization allows members to create repositories",
+        run_func=members_can_create_repos_run,
+        output_file="org_members_can_create_repositories.csv",
+        scope="org",
+    ),
+    "org-default-repo-permission": ModuleConfig(
+        name="org-default-repo-permission",
+        description="Check organization default repository permission",
+        run_func=default_repo_permission_run,
+        output_file="org_default_repository_permission.csv",
         scope="org",
     ),
     "org-commit-signing": ModuleConfig(

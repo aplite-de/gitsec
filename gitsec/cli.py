@@ -6,7 +6,16 @@ from typing import List, Optional
 
 import typer
 
+from .core.config_loader import load_config, merge_cli_args
 from .core.github_api import GitHubClient
+from .core.repo_filter import (
+    filter_repositories,
+    get_repository_branch,
+    should_skip_secrets_scanning,
+    should_skip_dependencies_scanning,
+    get_enabled_security_modules,
+    get_disabled_security_modules,
+)
 from .models.finding import DependencyFinding
 from .modules.dependency_scanning.scanner import DependencyScanner
 from .modules.secret_scanning.secrets import (
@@ -521,6 +530,9 @@ def audit_all(
         100,
         help="Maximum repositories for secret/dependency scanning (0 for unlimited). Repos sorted by recent activity.",
     ),
+    config: Optional[str] = typer.Option(
+        None, "--config", help="Path to configuration file (.gitsec.yml or .gitsec.json)"
+    ),
 ):
     """
     Run a comprehensive audit including secret scanning, dependency scanning, and security checks.
@@ -539,6 +551,12 @@ def audit_all(
 
     if repo and "/" not in repo:
         typer.echo("Error: --repo must be in the form 'owner/repo'", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        gitsec_config = load_config(config)
+    except ValueError as e:
+        typer.echo(f"Error loading configuration: {e}", err=True)
         raise typer.Exit(code=1)
 
     output_dir = Path(out_folder)
@@ -602,18 +620,10 @@ def audit_all(
         else:
             all_repos = []
 
-        sorted_repos = sorted(
-            all_repos, key=lambda r: r.get("pushed_at", ""), reverse=True
+        limited_repos = filter_repositories(all_repos, gitsec_config)
+        typer.echo(
+            f"Selected {len(limited_repos)} repositories (out of {len(all_repos)} total)\n"
         )
-
-        if max_repos > 0:
-            limited_repos = sorted_repos[:max_repos]
-            typer.echo(
-                f"Limited to {len(limited_repos)} most recently updated repositories (out of {len(all_repos)} total)\n"
-            )
-        else:
-            limited_repos = sorted_repos
-            typer.echo(f"Found {len(limited_repos)} repositories\n")
 
     secret_findings = []
     dependency_vulnerabilities = []
@@ -635,14 +645,21 @@ def audit_all(
                     module_progress["secrets"] = f"Scanning {local_repo}..."
                 findings = list(scan_local_repository(local_repo))
             elif repo:
-                with progress_lock:
-                    module_progress["secrets"] = f"Scanning {repo}..."
-                findings = list(scan_remote_repository(repo, client))
+                if should_skip_secrets_scanning(repo, gitsec_config):
+                    with progress_lock:
+                        module_progress["secrets"] = "Skipped (config)"
+                    findings = []
+                else:
+                    with progress_lock:
+                        module_progress["secrets"] = f"Scanning {repo}..."
+                    findings = list(scan_remote_repository(repo, client))
             elif org:
                 findings = []
                 total = len(limited_repos)
                 for idx, repo_data in enumerate(limited_repos, 1):
                     repo_full = repo_data["full_name"]
+                    if should_skip_secrets_scanning(repo_full, gitsec_config):
+                        continue
                     with progress_lock:
                         module_progress["secrets"] = (
                             f"Scanning {idx}/{total}: {repo_full}"
@@ -675,13 +692,17 @@ def audit_all(
                     if result:
                         results.append(result)
             elif repo:
-                with progress_lock:
-                    module_progress["dependencies"] = f"Scanning {repo}..."
-                owner, repo_name = repo.split("/")
-                with DependencyScanner(client) as scanner:
-                    result = scanner.scan_repository(owner=owner, repo=repo_name)
-                    if result:
-                        results.append(result)
+                if should_skip_dependencies_scanning(repo, gitsec_config):
+                    with progress_lock:
+                        module_progress["dependencies"] = "Skipped (config)"
+                else:
+                    with progress_lock:
+                        module_progress["dependencies"] = f"Scanning {repo}..."
+                    owner, repo_name = repo.split("/")
+                    with DependencyScanner(client) as scanner:
+                        result = scanner.scan_repository(owner=owner, repo=repo_name)
+                        if result:
+                            results.append(result)
             elif org:
                 with progress_lock:
                     module_progress["dependencies"] = "Initializing scanner..."
@@ -689,6 +710,8 @@ def audit_all(
                     total = len(limited_repos)
                     for idx, repo_data in enumerate(limited_repos, 1):
                         repo_full = repo_data["full_name"]
+                        if should_skip_dependencies_scanning(repo_full, gitsec_config):
+                            continue
                         owner, repo_name = repo_full.split("/")
                         with progress_lock:
                             module_progress["dependencies"] = (
@@ -767,6 +790,12 @@ def audit_all(
                     m for m, config in MODULES.items() if config.scope == "repo"
                 ]
 
+            enabled = get_enabled_security_modules(repo, gitsec_config, modules_to_run)
+            if enabled:
+                modules_to_run = enabled
+            disabled = get_disabled_security_modules(repo, gitsec_config)
+            modules_to_run = [m for m in modules_to_run if m not in disabled]
+
             total = len(modules_to_run)
             for idx, module_name in enumerate(modules_to_run, 1):
                 config = MODULES[module_name]
@@ -785,7 +814,8 @@ def audit_all(
                         else:
                             rows = list(config.run_func(client=client, org=org))
                     else:
-                        rows = list(config.run_func(client=client, repo=repo, branch=branch))
+                        check_branch = get_repository_branch(repo, gitsec_config, branch)
+                        rows = list(config.run_func(client=client, repo=repo, branch=check_branch))
                     security_findings.extend(rows)
                 except Exception:
                     pass
@@ -1045,6 +1075,61 @@ def audit_all(
 
     typer.echo(f"\n✓ Comprehensive report written to: {xls_path}")
     typer.echo("=" * 60 + "\n")
+
+
+@app.command("validate-config")
+def validate_config(
+    config: str = typer.Option(
+        None, "--config", help="Path to configuration file to validate"
+    ),
+):
+    """
+    Validate a gitsec configuration file.
+    
+    Checks if the configuration file is valid YAML/JSON and matches the expected schema.
+    """
+    if not config:
+        typer.echo("Error: --config parameter is required", err=True)
+        raise typer.Exit(code=1)
+    
+    try:
+        gitsec_config = load_config(config)
+        if not gitsec_config:
+            typer.echo(f"Error: Configuration file not found: {config}", err=True)
+            raise typer.Exit(code=1)
+        
+        typer.secho("✓ Configuration file is valid", fg=typer.colors.GREEN, bold=True)
+        typer.echo(f"\nConfiguration summary:")
+        
+        if gitsec_config.target:
+            if gitsec_config.target.org:
+                typer.echo(f"  Target: Organization '{gitsec_config.target.org}'")
+            elif gitsec_config.target.repo:
+                typer.echo(f"  Target: Repository '{gitsec_config.target.repo}'")
+            elif gitsec_config.target.local_repo:
+                typer.echo(f"  Target: Local repository '{gitsec_config.target.local_repo}'")
+        
+        if gitsec_config.repositories:
+            if gitsec_config.repositories.include:
+                typer.echo(f"  Include patterns: {len(gitsec_config.repositories.include)}")
+            if gitsec_config.repositories.exclude:
+                typer.echo(f"  Exclude patterns: {len(gitsec_config.repositories.exclude)}")
+            if gitsec_config.repositories.max_count:
+                typer.echo(f"  Max repositories: {gitsec_config.repositories.max_count}")
+        
+        if gitsec_config.security_checks:
+            if gitsec_config.security_checks.enabled_modules:
+                typer.echo(f"  Enabled modules: {len(gitsec_config.security_checks.enabled_modules)}")
+            if gitsec_config.security_checks.disabled_modules:
+                typer.echo(f"  Disabled modules: {len(gitsec_config.security_checks.disabled_modules)}")
+        
+        if gitsec_config.repository_overrides:
+            typer.echo(f"  Repository overrides: {len(gitsec_config.repository_overrides)}")
+        
+    except ValueError as e:
+        typer.secho(f"✗ Configuration file is invalid", fg=typer.colors.RED, bold=True)
+        typer.echo(f"\nError: {e}", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.callback(invoke_without_command=True)

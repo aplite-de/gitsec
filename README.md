@@ -36,6 +36,8 @@ Audit GitHub security configurations at organization and repository level.
 **Organization-level checks:**
 - MFA requirement status
 - SSO/SAML configuration
+- Default repository permissions
+- Members can create repositories
 - Commit signing enforcement
 - Pull request requirements
 - Push protection
@@ -83,6 +85,62 @@ Set your GitHub token:
 ```bash
 export GITHUB_TOKEN=your_github_personal_access_token
 ```
+
+### Configuration File
+
+gitsec supports configuration files for easier management of complex scans and consistent settings across runs. The tool automatically discovers configuration files in the following order:
+
+1. `.gitsec.yml` or `gitsec.yml` in the current directory
+2. `.gitsec.yml` in your home directory
+3. Custom path via `--config` flag
+
+**Configuration features:**
+- Define default targets (org/repo/local-repo)
+- Configure repository filtering (include/exclude patterns)
+- Enable/disable scanning modules globally or per-repository
+- Set custom branches for specific repositories
+- Control output formats and locations
+
+**Example configuration:**
+
+```yaml
+# Target specification
+target:
+  org: my-organization
+
+# Output folder
+output_folder: audit-results
+
+# Repository filtering
+repositories:
+  include:
+    - "frontend-*"
+    - "backend-api"
+  exclude:
+    - "*-archive"
+    - "*-deprecated"
+  max_count: 50
+  sort_by: pushed_at
+
+# Security checks configuration
+security_checks:
+  enabled_modules:
+    - org-mfa
+    - org-sso
+    - org-commit-signing
+
+# Per-repository overrides
+repository_overrides:
+  frontend-app:
+    branch: develop
+    enabled_modules:
+      - repo-commit-signing
+      - repo-pr-required
+```
+
+See `examples/gitsec.example.yml` for a comprehensive configuration template with all available options.
+
+**Note:** CLI arguments always take precedence over configuration file settings.
 
 ## Usage
 
@@ -179,6 +237,8 @@ gitsec security-checks repo-pr-required --repo owner/repo --branch new-feat
 ### Organization-level
 - `org-mfa` - Check if MFA is required for all organization members
 - `org-sso` - Check if SSO/SAML is configured
+- `org-default-repo-permission` - Check for overly permissive default repository permissions
+- `org-members-can-create-repos` - Check if members are allowed to create repositories
 - `org-commit-signing` - Check commit signing enforcement across all repositories
 - `org-pr-required` - Check PR requirements across all repositories
 - `org-push-protection` - Check push protection across all repositories
@@ -227,6 +287,10 @@ All commands support GitHub Enterprise Server via the `--base-url` flag:
 ```bash
 gitsec audit-all --org myorg --base-url https://github.mycorp.com
 ```
+
+## Performance
+
+gitsec caches API responses during command execution to reduce redundant requests and avoid rate limits.
 
 ## Token Permissions
 

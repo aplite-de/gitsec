@@ -1,0 +1,170 @@
+# Example gitsec configuration file
+#
+# This file demonstrates all available configuration options for gitsec.
+# Save as .gitsec.yml, gitsec.yml in your project directory, or ~/.gitsec.yml for user-level defaults.
+#
+# CLI arguments always take precedence over config file settings.
+
+# Target specification
+# Specify which organization, repository, or local path to scan
+target:
+  # Scan all repositories in an organization
+  org: my-organization
+  
+  # OR scan a single repository
+  # repo: owner/repository-name
+  
+  # OR scan a local repository
+  # local_repo: /path/to/local/repo
+
+# GitHub API configuration
+# base_url: https://api.github.com  # Use custom URL for GitHub Enterprise Server
+base_url: https://api.github.com
+
+# Output configuration
+output_folder: audit-results
+
+# Default branch to check (if not specified per-repository)
+# default_branch: main
+
+# Secret scanning configuration
+secrets_scanning:
+  enabled: true  # Set to false to disable secret scanning globally
+
+# Dependency scanning configuration
+dependencies_scanning:
+  enabled: true  # Set to false to disable dependency scanning globally
+
+# Security checks configuration
+security_checks:
+  # Option 1: Explicitly enable specific modules (overrides default "all")
+  enabled_modules:
+    - org-mfa
+    - org-sso
+    - org-commit-signing
+    - org-pr-required
+    - org-push-protection
+  
+  # Option 2: Disable specific modules from defaults
+  # disabled_modules:
+  #   - org-user-access
+  #   - org-secrets-scope
+
+# Repository filtering (for organization scans)
+repositories:
+  # Include only repositories matching these patterns
+  # Supports glob patterns (* and ?) or regex (prefix with "regex:")
+  include:
+    - "frontend-*"      # All repos starting with "frontend-"
+    - "backend-api"     # Exact match
+    - "infrastructure/*" # All repos in infrastructure namespace
+    # - "regex:^(prod|staging)-.*"  # Regex example
+  
+  # Exclude repositories matching these patterns
+  exclude:
+    - "*-archive"
+    - "*-deprecated"
+    - "test-*"
+    - "*-backup"
+  
+  # Maximum number of repositories to scan (0 for unlimited)
+  max_count: 50
+  
+  # How to sort repositories before limiting
+  # Options: pushed_at (default), created_at, updated_at, name
+  sort_by: pushed_at
+
+# Per-repository overrides
+# Customize settings for specific repositories
+repository_overrides:
+  # Repository name can be:
+  # - Full name: "owner/repo"
+  # - Short name: "repo" (will match any owner)
+  
+  frontend-app:
+    # Use a custom branch for this repository
+    branch: develop
+    
+    # Run only specific security checks for this repo
+    enabled_modules:
+      - repo-commit-signing
+      - repo-pr-required
+      - repo-push-protection
+  
+  legacy-api:
+    # Skip dependency scanning for this old project
+    skip_dependencies: true
+    
+    # Disable specific checks
+    disabled_modules:
+      - repo-commit-signing
+  
+  docs-site:
+    # Only scan for secrets
+    skip_dependencies: true
+    branch: gh-pages
+
+# ============================================================================
+# Additional examples for different use cases
+# ============================================================================
+
+# Example 1: Minimal config for org scan with defaults
+# ---
+# target:
+#   org: my-org
+
+# Example 2: Single repository scan with custom branch
+# ---
+# target:
+#   repo: owner/my-repo
+# default_branch: develop
+# security_checks:
+#   enabled_modules:
+#     - repo-commit-signing
+#     - repo-pr-required
+
+# Example 3: Organization scan with filtering and custom modules
+# ---
+# target:
+#   org: my-org
+# repositories:
+#   include:
+#     - "prod-*"
+#     - "staging-*"
+#   max_count: 20
+# security_checks:
+#   disabled_modules:
+#     - org-user-access
+
+# Example 4: Local repository scan
+# ---
+# target:
+#   local_repo: /path/to/repo
+# secrets_scanning:
+#   enabled: true
+# dependencies_scanning:
+#   enabled: true
+
+# Example 5: Comprehensive org audit with granular control
+# ---
+# target:
+#   org: acme-corp
+# output_folder: security-audit
+# repositories:
+#   include: ["*"]
+#   exclude: ["*-test", "*-backup"]
+#   max_count: 100
+#   sort_by: updated_at
+# security_checks:
+#   enabled_modules:
+#     - org-mfa
+#     - org-sso
+#     - org-commit-signing
+# repository_overrides:
+#   critical-app:
+#     branch: production
+#     enabled_modules:
+#       - repo-commit-signing
+#       - repo-pr-required
+#       - repo-push-protection
+#       - repo-tag-deletion-protection

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "gitsec"
-version = "1.0.1"
+version = "1.1.0"
 description = "Python tool that helps you enhance your GitHub security posture at scale."
 authors = ["Aplite hi@aplite.de"]
 license = "MIT"
@@ -15,6 +15,7 @@ httpx = "0.28.1"
 detect-secrets = "1.5.0"
 gitpython = "3.1.45"
 openpyxl = "3.1.5"
+pyyaml = "6.0.3"
 
 [tool.poetry.scripts]
 gitsec = "gitsec.cli:app"

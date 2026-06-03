@@ -1,7 +1,7 @@
 """Check if users have excessive repository access permissions."""
 
-import time
-from typing import Iterable
+from collections import defaultdict
+from typing import Dict, Iterable, List, Set
 
 import typer
 
@@ -13,18 +13,9 @@ ADMIN_FAIL_THRESHOLD = 15
 WRITE_WARN_THRESHOLD = 20
 WRITE_FAIL_THRESHOLD = 50
 
-CHUNK_SIZE = 25
-DELAY_BETWEEN_CHUNKS = 2
-
 
 def run(client: GitHubClient, org: str, max_repos: int = 100, **_) -> Iterable[Finding]:
     try:
-        typer.echo(f"Fetching organization members for {org}...")
-        org_members = client.rest_paginate(f"/orgs/{org}/members", per_page=100)
-
-        if not org_members:
-            return
-
         typer.echo(f"Fetching organization repositories for {org}...")
         org_repos = client.rest_paginate(f"/orgs/{org}/repos", per_page=100)
 
@@ -50,69 +41,62 @@ def run(client: GitHubClient, org: str, max_repos: int = 100, **_) -> Iterable[F
             )
 
         typer.echo("Identifying organization owners...")
-        owners = []
+        owners: Set[str] = set()
         try:
             owner_response = client.rest_paginate(
                 f"/orgs/{org}/members", params={"role": "admin"}, per_page=100
             )
-            owners = [
+            owners = {
                 member.get("login") for member in owner_response if member.get("login")
-            ]
+            }
             if owners:
                 typer.echo(f"Found {len(owners)} organization owners")
         except Exception:
             typer.echo("Could not retrieve organization owners")
 
-        typer.echo(f"Analyzing permissions for {len(org_members)} members...")
-        members_processed = 0
+        admin_repos: Dict[str, List[str]] = defaultdict(list)
+        write_repos: Dict[str, List[str]] = defaultdict(list)
 
-        for member in org_members:
-            username = member.get("login")
-            if not username:
+        for i, repo in enumerate(repos_to_check):
+            repo_name = repo.get("full_name")
+            if not repo_name:
                 continue
 
-            members_processed += 1
-            if members_processed % 10 == 0:
+            if (i + 1) % 10 == 0 or i + 1 == len(repos_to_check):
                 typer.echo(
-                    f"Progress: {members_processed}/{len(org_members)} members processed"
+                    f"Progress: {i + 1}/{len(repos_to_check)} repositories scanned"
                 )
 
-            if username in owners:
-                yield Finding(
-                    check_id="org-user-access",
-                    resource=f"org/{org}",
-                    evidence=f"User '{username}' has organization owner privileges",
-                    notes="Organization owner role grants admin access to all repositories",
+            try:
+                collaborators = client.rest_paginate(
+                    f"/repos/{repo_name}/collaborators", per_page=100
                 )
+            except Exception:
                 continue
 
-            admin_repos = []
-            write_repos = []
-
-            for i, repo in enumerate(repos_to_check):
-                repo_name = repo.get("full_name")
-                if not repo_name:
+            for collab in collaborators:
+                username = collab.get("login")
+                if not username or username in owners:
                     continue
 
-                try:
-                    perm_response = client.get(
-                        f"/repos/{repo_name}/collaborators/{username}/permission"
-                    )
-                    permission = perm_response.get("permission", "none")
+                role = collab.get("role_name", "")
+                if role == "admin":
+                    admin_repos[username].append(repo_name)
+                elif role in ("maintain", "write"):
+                    write_repos[username].append(repo_name)
 
-                    if permission == "admin":
-                        admin_repos.append(repo_name)
-                    elif permission in ["maintain", "push"]:
-                        write_repos.append(repo_name)
+        for username in sorted(owners):
+            yield Finding(
+                check_id="org-user-access",
+                resource=f"org/{org}",
+                evidence=f"User '{username}' has organization owner privileges",
+                notes="Organization owner role grants admin access to all repositories",
+            )
 
-                except Exception:
-                    continue
-
-                if (i + 1) % CHUNK_SIZE == 0 and i + 1 < len(repos_to_check):
-                    time.sleep(DELAY_BETWEEN_CHUNKS)
-
-            admin_count = len(admin_repos)
-            write_count = len(write_repos)
+        all_users = sorted(set(admin_repos.keys()) | set(write_repos.keys()))
+        for username in all_users:
+            admin_count = len(admin_repos[username])
+            write_count = len(write_repos[username])
             total_elevated = admin_count + write_count
 
             if admin_count > ADMIN_FAIL_THRESHOLD:
@@ -145,7 +129,7 @@ def run(client: GitHubClient, org: str, max_repos: int = 100, **_) -> Iterable[F
                 )
 
         typer.echo(
-            f"Analysis complete: {len(org_members)} members, {len(owners)} owners, {len(repos_to_check)} repositories checked"
+            f"Analysis complete: {len(all_users)} users with elevated access, {len(owners)} owners, {len(repos_to_check)} repositories checked"
         )
 
     except Exception as e:

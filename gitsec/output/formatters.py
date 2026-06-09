@@ -4,6 +4,9 @@ from typing import List
 
 from ..models.finding import Finding, DependencyFinding, SecretFinding
 
+def _filter_row_to_fieldnames(row: dict, fieldnames: List[str]) -> dict:
+    return {key: row.get(key) for key in fieldnames}
+
 
 def format_security_check_results(findings: List[Finding], output_path: Path) -> None:
     if not findings:
@@ -31,7 +34,7 @@ def format_security_check_results(findings: List[Finding], output_path: Path) ->
         writer.writeheader()
 
         for finding in findings:
-            writer.writerow(finding.to_dict())
+            writer.writerow(_filter_row_to_fieldnames(finding.to_dict(), fieldnames))
 
 
 def format_dependency_findings(
@@ -60,7 +63,7 @@ def format_dependency_findings(
         writer.writeheader()
 
         for finding in findings:
-            writer.writerow(finding.to_dict())
+            writer.writerow(_filter_row_to_fieldnames(finding.to_dict(), fieldnames))
 
 
 def format_secret_findings(findings: List[SecretFinding], output_path: Path) -> None:
@@ -82,4 +85,4 @@ def format_secret_findings(findings: List[SecretFinding], output_path: Path) -> 
         writer.writeheader()
 
         for finding in findings:
-            writer.writerow(finding.to_dict())
+            writer.writerow(_filter_row_to_fieldnames(finding.to_dict(), fieldnames))

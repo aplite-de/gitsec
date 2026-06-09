@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ from ..models.finding import DependencyFinding, Finding, SecretFinding
 
 
 class ExcelReportWriter:
+    TABLE_NAME_INVALID_CHARS = re.compile(r"[^A-Za-z0-9_.]")
+    TABLE_NAME_CELL_REF = re.compile(r"^[A-Za-z]{1,3}[1-9][0-9]{0,6}$")
     SEVERITY_ORDER = ["critical", "high", "medium", "low", "unknown"]
     SEVERITY_COLORS = {
         "critical": "8B0000",
@@ -33,6 +36,7 @@ class ExcelReportWriter:
         self.output_path = output_path
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.wb = Workbook()
+        self._used_table_names: set[str] = set()
         if self.wb.active:
             self.wb.remove(self.wb.active)
 
@@ -114,16 +118,12 @@ class ExcelReportWriter:
 
         if row > header_row + 1:
             table_ref = f"A{header_row}:{get_column_letter(len(headers))}{row - 1}"
-            table = Table(displayName=sheet_name.replace(" ", "_"), ref=table_ref)
-            style = TableStyleInfo(
-                name="TableStyleMedium9",
-                showFirstColumn=False,
-                showLastColumn=False,
-                showRowStripes=True,
-                showColumnStripes=False,
+            self._add_table(
+                ws=ws,
+                table_ref=table_ref,
+                base_name=sheet_name,
+                style_name="TableStyleMedium9",
             )
-            table.tableStyleInfo = style
-            ws.add_table(table)
 
         self._auto_adjust_columns(ws)
 
@@ -201,16 +201,12 @@ class ExcelReportWriter:
 
             if row > header_row + 1:
                 table_ref = f"A{header_row}:{get_column_letter(len(headers))}{row - 1}"
-                table = Table(displayName="Dependency_Vulnerabilities", ref=table_ref)
-                style = TableStyleInfo(
-                    name="TableStyleMedium9",
-                    showFirstColumn=False,
-                    showLastColumn=False,
-                    showRowStripes=True,
-                    showColumnStripes=False,
+                self._add_table(
+                    ws=ws,
+                    table_ref=table_ref,
+                    base_name="Dependency_Vulnerabilities",
+                    style_name="TableStyleMedium9",
                 )
-                table.tableStyleInfo = style
-                ws.add_table(table)
 
             self._auto_adjust_columns(ws)
 
@@ -247,16 +243,12 @@ class ExcelReportWriter:
 
             if row > header_row + 1 and headers:
                 table_ref = f"A{header_row}:{get_column_letter(len(headers))}{row - 1}"
-                table = Table(displayName="Deprecated_Packages", ref=table_ref)
-                style = TableStyleInfo(
-                    name="TableStyleMedium2",
-                    showFirstColumn=False,
-                    showLastColumn=False,
-                    showRowStripes=True,
-                    showColumnStripes=False,
+                self._add_table(
+                    ws=ws,
+                    table_ref=table_ref,
+                    base_name="Deprecated_Packages",
+                    style_name="TableStyleMedium2",
                 )
-                table.tableStyleInfo = style
-                ws.add_table(table)
 
             self._auto_adjust_columns(ws)
 
@@ -293,16 +285,12 @@ class ExcelReportWriter:
 
             if row > header_row + 1 and headers:
                 table_ref = f"A{header_row}:{get_column_letter(len(headers))}{row - 1}"
-                table = Table(displayName="Unpinned_Dependencies", ref=table_ref)
-                style = TableStyleInfo(
-                    name="TableStyleMedium2",
-                    showFirstColumn=False,
-                    showLastColumn=False,
-                    showRowStripes=True,
-                    showColumnStripes=False,
+                self._add_table(
+                    ws=ws,
+                    table_ref=table_ref,
+                    base_name="Unpinned_Dependencies",
+                    style_name="TableStyleMedium2",
                 )
-                table.tableStyleInfo = style
-                ws.add_table(table)
 
             self._auto_adjust_columns(ws)
 
@@ -352,16 +340,12 @@ class ExcelReportWriter:
 
         if row > header_row + 1:
             table_ref = f"A{header_row}:{get_column_letter(len(headers))}{row - 1}"
-            table = Table(displayName="Secret_Findings", ref=table_ref)
-            style = TableStyleInfo(
-                name="TableStyleMedium6",
-                showFirstColumn=False,
-                showLastColumn=False,
-                showRowStripes=True,
-                showColumnStripes=False,
+            self._add_table(
+                ws=ws,
+                table_ref=table_ref,
+                base_name="Secret_Findings",
+                style_name="TableStyleMedium6",
             )
-            table.tableStyleInfo = style
-            ws.add_table(table)
 
         self._auto_adjust_columns(ws)
 
@@ -658,3 +642,45 @@ class ExcelReportWriter:
             ws.column_dimensions[get_column_letter(column_cells[0].column)].width = min(
                 length + 2, 50
             )
+
+    def _add_table(
+        self, ws, table_ref: str, base_name: str, style_name: str
+    ) -> None:
+        table = Table(displayName=self._sanitize_table_name(base_name), ref=table_ref)
+        style = TableStyleInfo(
+            name=style_name,
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False,
+        )
+        table.tableStyleInfo = style
+        ws.add_table(table)
+
+    def _sanitize_table_name(self, name: str) -> str:
+        candidate = self.TABLE_NAME_INVALID_CHARS.sub("_", name.replace(" ", "_"))
+        candidate = candidate.strip("_")
+
+        if not candidate:
+            candidate = "Table"
+
+        if not re.match(r"^[A-Za-z_\\]", candidate):
+            candidate = f"T_{candidate}"
+
+        if self.TABLE_NAME_CELL_REF.match(candidate.upper()):
+            candidate = f"T_{candidate}"
+
+        max_length = 255
+        candidate = candidate[:max_length]
+        base_candidate = candidate
+        suffix = 1
+
+        while candidate.lower() in self._used_table_names:
+            suffix_text = f"_{suffix}"
+            candidate = (
+                f"{base_candidate[: max_length - len(suffix_text)]}{suffix_text}"
+            )
+            suffix += 1
+
+        self._used_table_names.add(candidate.lower())
+        return candidate

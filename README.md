@@ -158,7 +158,7 @@ gitsec audit-all --repo owner/repo --out-folder results
 
 ### Comprehensive Audit
 
-The `audit-all` command runs all three security modules and generates a single Excel report.
+The `audit-all` command generates a single HTML file containing all findings with a summary view.
 
 ```bash
 # Organization
@@ -177,7 +177,7 @@ gitsec audit-all --local-repo /path/to/repo
 gitsec audit-all --org myorg --base-url https://github.mycorp.com
 ```
 
-**Output:** Single Excel file (`audit_all_<target>.xlsx`) with all findings and a combined summary sheet.
+**Output:** Single HTML file (`audit_all_<target>.html`) with all findings and a combined summary view.
 
 **Note:** Security checks are not available for local repositories.
 
@@ -193,8 +193,8 @@ gitsec scan-secrets --org myorg
 # Local repository
 gitsec scan-secrets --local-repo /path/to/repo
 
-# Choose output format (csv, xls, or csv,xls)
-gitsec scan-secrets --repo owner/repo --format csv,xls --out-folder reports
+# Choose output format (csv, html, or csv,html)
+gitsec scan-secrets --repo owner/repo --format csv,html --out-folder reports
 ```
 
 ### Dependency Scanning
@@ -209,8 +209,8 @@ gitsec scan-dependencies --org myorg
 # Local repository
 gitsec scan-dependencies --local-repo /path/to/repo
 
-# Choose output format (csv, xls, or csv,xls)
-gitsec scan-dependencies --repo owner/repo --format xls
+# Choose output format (csv, html, or csv,html)
+gitsec scan-dependencies --repo owner/repo --format html
 ```
 
 ### Security Checks
@@ -259,10 +259,10 @@ gitsec security-checks repo-pr-required --repo owner/repo --branch new-feat
 All commands generate reports in the specified output directory:
 
 - **CSV format:** Individual CSV files for each finding type
-- **Excel format:** Comprehensive Excel workbook with multiple sheets and summary
-- **Combined format:** Both CSV and Excel (use `--format csv,xls`)
+- **HTML format:** Interactive HTML report with filtering, search, and summary
+- **Combined format:** Both CSV and HTML (use `--format csv,html`)
 
-The `audit-all` command generates a single Excel file containing all findings with a summary sheet.
+The `audit-all` command generates a single HTML file containing all findings with a summary view.
 
 ### Example Reports
 

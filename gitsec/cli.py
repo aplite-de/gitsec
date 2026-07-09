@@ -24,7 +24,7 @@ from .modules.secret_scanning.secrets import (
     scan_remote_repository,
 )
 from .output import (
-    ExcelReportWriter,
+    HtmlReportWriter,
     format_dependency_findings,
     format_secret_findings,
 )
@@ -57,7 +57,7 @@ def security_checks(
     ),
     out_folder: str = typer.Option("out", "--out-folder", help="Output folder"),
     format: str = typer.Option(
-        "xls", "--format", help="Output format: csv, xls, or csv,xls for both"
+        "html", "--format", help="Output format: csv, html, or csv,html for both"
     ),
     max_repos: int = typer.Option(
         100, help="Maximum repositories for org-user-access check (0 for unlimited)"
@@ -121,7 +121,7 @@ def security_checks(
         raise typer.Exit(code=1)
 
     formats = [f.strip() for f in format.split(",")]
-    valid_formats = ["csv", "xls"]
+    valid_formats = ["csv", "html"]
     invalid_formats = [f for f in formats if f not in valid_formats]
     if invalid_formats:
         typer.echo(f"Error: Invalid format(s): {', '.join(invalid_formats)}", err=True)
@@ -216,7 +216,7 @@ def scan_dependencies(
     ),
     out_folder: str = typer.Option("out", "--out-folder", help="Output folder"),
     format: str = typer.Option(
-        "xls", "--format", help="Output format: csv, xls, or csv,xls for both"
+        "html", "--format", help="Output format: csv, html, or csv,html for both"
     ),
 ):
     """
@@ -272,7 +272,7 @@ def scan_dependencies(
         raise typer.Exit(code=1)
 
     formats = [f.strip() for f in format.split(",")]
-    valid_formats = ["csv", "xls"]
+    valid_formats = ["csv", "html"]
     invalid_formats = [f for f in formats if f not in valid_formats]
     if invalid_formats:
         typer.echo(f"Error: Invalid format(s): {', '.join(invalid_formats)}", err=True)
@@ -384,19 +384,14 @@ def scan_dependencies(
                 writer.writerows(unpinned_list)
             output_paths.append(str(unpinned_path))
 
-    if "xls" in formats:
-        xls_path = output_dir / f"{base_name}.xlsx"
-        xls_writer = ExcelReportWriter(xls_path)
-        xls_writer.add_dependency_findings(
+    if "html" in formats:
+        html_path = output_dir / f"{base_name}.html"
+        html_writer = HtmlReportWriter(html_path)
+        html_writer.add_dependency_findings(
             vuln_findings, deprecated_list, unpinned_list
         )
-        xls_writer.add_summary_sheet(
-            dependency_findings=vuln_findings,
-            deprecated_packages=deprecated_list,
-            unpinned_dependencies=unpinned_list,
-        )
-        xls_writer.save()
-        output_paths.append(str(xls_path))
+        html_writer.save()
+        output_paths.append(str(html_path))
 
     typer.echo("\nResults written to:")
     for path in output_paths:
@@ -424,7 +419,7 @@ def scan_secrets(
     ),
     out_folder: str = typer.Option("out", "--out-folder", help="Output folder"),
     format: str = typer.Option(
-        "xls", "--format", help="Output format: csv, xls, or csv,xls for both"
+        "html", "--format", help="Output format: csv,html, or csv,html for both"
     ),
 ):
     """
@@ -439,7 +434,7 @@ def scan_secrets(
         raise typer.Exit(code=1)
 
     formats = [f.strip() for f in format.split(",")]
-    valid_formats = ["csv", "xls"]
+    valid_formats = ["csv", "html"]
     invalid_formats = [f for f in formats if f not in valid_formats]
     if invalid_formats:
         typer.echo(f"Error: Invalid format(s): {', '.join(invalid_formats)}", err=True)
@@ -490,13 +485,12 @@ def scan_secrets(
             format_secret_findings(secret_findings, csv_path)
             output_paths.append(str(csv_path))
 
-        if "xls" in formats:
-            xls_path = output_dir / f"{base_name}.xlsx"
-            writer = ExcelReportWriter(xls_path)
+        if "html" in formats:
+            html_path = output_dir / f"{base_name}.html"
+            writer = HtmlReportWriter(html_path)
             writer.add_secret_findings(secret_findings)
-            writer.add_summary_sheet(secret_findings=secret_findings)
             writer.save()
-            output_paths.append(str(xls_path))
+            output_paths.append(str(html_path))
 
         typer.echo("\nResults written to:")
         for path in output_paths:
@@ -538,7 +532,7 @@ def audit_all(
     Run a comprehensive audit including secret scanning, dependency scanning, and security checks.
 
     This command orchestrates all three security modules and generates a single comprehensive
-    Excel report with all findings.
+    HTML report with all findings.
 
     Specify exactly one of: --repo, --org, or --local-repo
 
@@ -962,8 +956,8 @@ def audit_all(
     typer.echo("Generating comprehensive report...")
     typer.echo("=" * 60)
 
-    xls_path = output_dir / f"audit_all_{target_name}.xlsx"
-    writer = ExcelReportWriter(xls_path)
+    html_path = output_dir / f"audit_all_{target_name}.html"
+    writer = HtmlReportWriter(html_path)
 
     actual_security_findings = [f for f in security_findings if not f.is_error]
     security_check_errors = [f for f in security_findings if f.is_error]
@@ -978,19 +972,6 @@ def audit_all(
 
     if secret_findings:
         writer.add_secret_findings(secret_findings)
-
-    writer.add_summary_sheet(
-        security_findings=(
-            actual_security_findings if actual_security_findings else None
-        ),
-        dependency_findings=(
-            dependency_vulnerabilities if dependency_vulnerabilities else None
-        ),
-        secret_findings=secret_findings if secret_findings else None,
-        deprecated_packages=deprecated_packages if deprecated_packages else None,
-        unpinned_dependencies=unpinned_dependencies if unpinned_dependencies else None,
-    )
-
     writer.save()
 
     typer.echo("\n" + "=" * 60)
@@ -1073,7 +1054,7 @@ def audit_all(
 
         typer.echo("\n" + "=" * 60)
 
-    typer.echo(f"\n✓ Comprehensive report written to: {xls_path}")
+    typer.echo(f"\n✓ Comprehensive report written to: {html_path}")
     typer.echo("=" * 60 + "\n")
 
 

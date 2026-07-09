@@ -6,7 +6,7 @@ from typing import List
 import typer
 
 from ..models import Finding
-from ..output import ExcelReportWriter, format_security_check_results
+from ..output import HtmlReportWriter, format_security_check_results
 
 
 def get_token_or_exit(cli_token: str | None) -> str:
@@ -97,19 +97,11 @@ def write_outputs(
         format_security_check_results(findings, csv_path)
         output_paths.append(str(csv_path))
 
-    if "xls" in formats:
-        xls_path = output_folder / f"{base_filename}.xlsx"
-        writer = ExcelReportWriter(xls_path)
-
-        parts = base_filename.split("_")
-        if len(parts) >= 3 and parts[0] == "security" and parts[1] == "checks":
-            repo_name = parts[-1]
-            sheet_name = f"sec_checks_{repo_name}"
-        else:
-            sheet_name = base_filename
-        writer.add_security_findings(findings, sheet_name=sheet_name)
-        writer.add_summary_sheet(security_findings=findings)
+    if "html" in formats:
+        html_path = output_folder / f"{base_filename}.html"
+        writer = HtmlReportWriter(html_path)
+        writer.add_security_findings(findings)
         writer.save()
-        output_paths.append(str(xls_path))
+        output_paths.append(str(html_path))
 
     return output_paths

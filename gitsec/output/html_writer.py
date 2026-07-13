@@ -239,14 +239,16 @@ HTML_TEMPLATE = r'''
   .logo-name { font-size: 24px; font-weight: 800; line-height: 1; letter-spacing: -.04em; color: #FFFFFF; }
   .logo-sub { margin-top: 6px; font-size: 13px; font-weight: 700; color: #9FF7D5; }
   .meta {
+    display: grid;
+    gap: 5px;
     color: #CBE0D7;
     font-size: 12px;
     font-family: var(--mono);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 9px 14px;
-    background: rgba(103,227,175,.055);
+    text-align: left;
   }
+  .meta-row { display: flex; gap: 8px; align-items: baseline; justify-content: flex-end; }
+  .meta-label { color: rgba(234,245,240,.68); min-width: 108px; }
+  .meta-value { color: #FFFFFF; }
 
   .main { display: flex; flex: 1; min-height: 0; }
   .list-pane { flex: 1; min-width: 0; padding: 28px 32px 36px; }
@@ -433,12 +435,9 @@ HTML_TEMPLATE = r'''
     word-break: break-word;
   }
   .code-block { font-family: var(--mono); font-size: 12px; }
-  .risk-block { border-color: rgba(240,138,36,.30); color: #FFD3A8; background: rgba(240,138,36,.05); }
-  .fix-block { border-color: rgba(103,227,175,.30); color: #CFFBE7; background: rgba(103,227,175,.045); }
-  .warn-block { border-color: rgba(233,75,75,.34); color: #FFC7C7; background: rgba(233,75,75,.06); }
 
   .summary-top-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
-  .summary-grid { display: grid; grid-template-columns: minmax(330px, .9fr) minmax(360px, 1.1fr); gap: 18px; margin-bottom: 18px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
   .summary-card, .summary-panel {
     background: rgba(7,24,22,.94);
     border: 1px solid var(--border);
@@ -446,18 +445,25 @@ HTML_TEMPLATE = r'''
     padding: 18px 20px;
     box-shadow: 0 8px 22px rgba(0,0,0,.16);
   }
+  .summary-card { text-align: center; }
   .summary-card-label, .summary-section-label { color: rgba(234,245,240,.70); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .summary-large-title { color: #FFFFFF; font-size: 18px; font-weight: 900; line-height: 1.25; letter-spacing: 0; text-transform: none; margin-bottom: 18px; text-align: center; }
   .summary-card-value { font-size: 34px; font-weight: 800; color: #FFFFFF; line-height: 1; }
   .summary-card-sub { color: #8DD6C4; font-size: 13px; margin-top: 8px; }
   .summary-section-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
   .summary-section-subtitle { color: #8DD6C4; font-size: 13px; margin-top: 2px; }
-  .summary-list { display: grid; gap: 11px; }
-  .summary-row { display: grid; grid-template-columns: 12px minmax(120px,1fr) auto auto; align-items: center; gap: 10px; font-size: 14px; }
-  .summary-percent { color: #8DD6C4; font-weight: 800; }
-  .summary-count { color: #FFFFFF; font-weight: 900; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 999px; }
-  .pie-wrap { display: grid; grid-template-columns: 190px 1fr; gap: 22px; align-items: center; }
-  .pie-chart { width: 190px; height: 190px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); box-shadow: inset 0 0 0 31px var(--bg); background: conic-gradient(#9CA3AF 0deg 360deg); }
+  .summary-list { display: grid; gap: 12px; width: min(100%, 460px); margin: 0 auto; }
+  .type-summary-list { margin-top: 78px; }
+  .summary-row { display: grid; align-items: center; gap: 12px; font-size: 18px; }
+  .summary-row.severity-row,
+  .summary-row.type-row { grid-template-columns: 14px minmax(150px, 210px) 70px 38px; justify-content: center; text-align: left; }
+  .summary-label { font-weight: 500; }
+  .summary-percent { color: #8DD6C4; font-weight: 800; text-align: right; }
+  .summary-count { color: #FFFFFF; font-weight: 900; text-align: right; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 999px; }
+  .legend-spacer { width: 12px; height: 12px; }
+  .pie-wrap { display: grid; grid-template-columns: 220px minmax(270px, 430px); gap: 24px; align-items: center; justify-content: center; }
+  .pie-chart { width: 220px; height: 220px; border-radius: 50%; background: conic-gradient(#9CA3AF 0deg 360deg); }
 
   .view-switch {
     display: inline-flex;
@@ -507,23 +513,82 @@ HTML_TEMPLATE = r'''
     cursor: pointer;
   }
   .show-all-btn:hover { background: rgba(103,227,175,.14); border-color: rgba(141,214,196,.45); }
-  .group-all-findings { margin-top: 12px; display: grid; gap: 9px; }
+  .group-all-findings { margin-top: 12px; }
   .group-all-findings[hidden] { display: none; }
-  .group-finding-item {
-    border: 1px solid rgba(141,214,196,.16);
-    border-radius: 12px;
-    padding: 10px 12px;
-    background: rgba(255,255,255,.014);
+
+  .findings-view-panel { margin-top: 0; }
+  .grouped-findings-panel { margin-bottom: 18px; }
+  .default-finding-row {
+    display: grid;
+    grid-template-columns: minmax(106px,.8fr) minmax(116px,.9fr) minmax(280px,3fr) minmax(140px,1fr);
+    align-items: center;
+    gap: 12px;
+    min-height: 68px;
+    padding: 15px 16px;
+    cursor: pointer;
   }
-  .group-finding-title { color: #F4FFFA; font-weight: 700; line-height: 1.35; }
-  .group-finding-meta { color: #8DD6C4; font-size: 12px; margin-top: 5px; line-height: 1.45; }
+  .default-finding-row:hover { background: rgba(103,227,175,.045); }
+  .default-finding-row.selected { border-left: 3px solid var(--accent); background: rgba(103,227,175,.07); }
+  .top-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .action-card {
+    border: 1px solid rgba(141,214,196,.20);
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255,255,255,.015);
+  }
+  .action-card summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #F4FFFA;
+    font-weight: 800;
+  }
+  .action-card summary::-webkit-details-marker { display: none; }
+  .action-card-title { color: #F4FFFA; font-size: 15px; font-weight: 800; line-height: 1.35; }
+  .action-card-meta { color: #F4FFFA; font-size: 14px; font-weight: 800; line-height: 1.35; text-align: right; white-space: nowrap; }
+  .action-card-body { border-top: 1px solid rgba(141,214,196,.14); color: rgba(234,245,240,.84); font-size: 13px; line-height: 1.5; padding: 13px 16px; }
+  .action-resources { margin-top: 12px; display: grid; gap: 7px; }
+  .action-resources[hidden] { display: none; }
+  .resource-pill {
+    border: 1px solid rgba(141,214,196,.16);
+    border-radius: 999px;
+    padding: 7px 10px;
+    color: #CFFBE7;
+    background: rgba(103,227,175,.045);
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .group-preview-table { display: grid; gap: 0; border: 1px solid rgba(141,214,196,.16); border-radius: 12px; overflow: hidden; }
+  .group-preview-table[hidden] { display: none; }
+  .group-preview-head { display:grid; grid-template-columns: minmax(180px,.75fr) minmax(260px,1.25fr); gap:12px; padding:10px 12px; border-bottom:1px solid rgba(141,214,196,.14); color: rgba(234,245,240,.72); font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+  .group-preview-row {
+    display: grid;
+    grid-template-columns: minmax(180px,.75fr) minmax(260px,1.25fr);
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(141,214,196,.14);
+  }
+  .group-preview-row:last-child { border-bottom: 0; }
+  .group-preview-repo { color: #CFFBE7; font-family: var(--mono); font-size: 12px; word-break: break-word; }
+  .group-preview-evidence { color: #8DD6C4; font-size: 12px; line-height: 1.45; word-break: break-word; }
 
 
   @media (max-width: 1260px) {
     body.detail-open .list-pane { padding-right: 32px; }
-    .filters, .summary-top-grid, .summary-grid, .group-body-grid { grid-template-columns: 1fr; }
+    .filters, .summary-top-grid, .summary-grid, .top-actions-grid, .group-preview-row, .group-preview-head, .default-finding-row { grid-template-columns: 1fr; }
     .filter-group { height: auto; min-height: 44px; flex-wrap: wrap; overflow: visible; }
     .pie-wrap { grid-template-columns: 1fr; }
+    .type-summary-list { margin-top: 18px; }
   }
   @media (max-width: 760px) {
     .header { align-items: flex-start; flex-direction: column; }
@@ -554,11 +619,11 @@ HTML_TEMPLATE = r'''
 <main class="main">
   <section class="list-pane">
     <nav class="report-tabs" aria-label="Report tabs">
-      <button class="report-tab-btn active" data-tab="findings" onclick="switchTab(this)">Findings</button>
-      <button class="report-tab-btn" data-tab="summary" onclick="switchTab(this)">Summary</button>
+      <button class="report-tab-btn active" data-tab="summary" onclick="switchTab(this)">Summary</button>
+      <button class="report-tab-btn" data-tab="findings" onclick="switchTab(this)">Findings</button>
     </nav>
 
-    <section id="findings-panel" class="tab-panel active">
+    <section id="findings-panel" class="tab-panel">
       <div class="control-panel">
         <div class="control-title">Triage Controls</div>
         <div class="filters">
@@ -582,14 +647,26 @@ HTML_TEMPLATE = r'''
         </div>
       </div>
 
+      <div class="summary-panel grouped-findings-panel">
+        <div class="summary-section-head">
+          <div class="summary-section-label">Grouped Findings</div>
+          <div class="view-switch" aria-label="Findings grouping">
+            <button class="view-btn" data-findings-mode="finding" data-mode="finding" onclick="setFindingsGroupMode(this)">By issue</button>
+            <button class="view-btn" data-findings-mode="resource" data-mode="resource" onclick="setFindingsGroupMode(this)">By repo</button>
+            <button class="view-btn active" data-findings-mode="flat" data-mode="flat" onclick="setFindingsGroupMode(this)">Default</button>
+          </div>
+        </div>
+        <div id="findings-view"></div>
+      </div>
+
       <div class="result-count" id="result-count"></div>
-      <div class="table">
+      <div class="table" id="findings-table">
         <div class="table-head"><span>Severity</span><span>Type</span><span>Finding</span><span>Resource</span></div>
         <div id="rows"></div>
       </div>
     </section>
 
-    <section id="summary-panel" class="tab-panel"></section>
+    <section id="summary-panel" class="tab-panel active"></section>
   </section>
 
   <aside class="detail-pane" id="detail">
@@ -605,11 +682,17 @@ const TYPE_ORDER = ['check', 'dependency', 'secret', 'unknown'];
 const SEVERITY_COLORS = {Critical:'#E94B4B', High:'#F08A24', Medium:'#E0BE42', Low:'#4C93F0', Unknown:'#9CA3AF'};
 let activeSev = 'All';
 let activeType = 'All';
-let summaryGroupMode = 'finding';
+let findingsGroupMode = 'flat';
 let selectedIdx = null;
 
 function initializeReport() {
-  document.getElementById('meta-info').textContent = `${(REPORT.findings || []).length} findings · ${new Date().toLocaleDateString('en-GB')}`;
+  const target = scannedTarget();
+  const generated = new Date().toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'});
+  document.getElementById('meta-info').innerHTML = `
+    <div class="meta-row"><span class="meta-label">Scanned target:</span><span class="meta-value">${esc(target)}</span></div>
+    <div class="meta-row"><span class="meta-label">Generated date:</span><span class="meta-value">${esc(generated)}</span></div>
+    <div class="meta-row"><span class="meta-label">Total findings:</span><span class="meta-value">${(REPORT.findings || []).length}</span></div>`;
+  renderSummaryDashboard();
   applyFilters();
 }
 
@@ -659,18 +742,9 @@ function setType(btn) {
   applyFilters();
 }
 
-function setSummaryGroupMode(btn) {
-  summaryGroupMode = btn.dataset.mode;
-
-  // No group is intended as a neutral/raw view, so reset only the severity filter
-  // when entering it. Search and Type filters remain active because they are explicit
-  // triage filters, but the user should not be stuck seeing only Critical findings.
-  if (summaryGroupMode === 'flat' && activeSev !== 'All') {
-    activeSev = 'All';
-    syncSeverityButtons();
-  }
-
-  document.querySelectorAll('[data-summary-mode]').forEach(item => item.classList.remove('active'));
+function setFindingsGroupMode(btn) {
+  findingsGroupMode = btn.dataset.mode || 'flat';
+  document.querySelectorAll('[data-findings-mode]').forEach(item => item.classList.remove('active'));
   btn.classList.add('active');
   applyFilters();
 }
@@ -701,8 +775,23 @@ function applyFilters() {
   const findings = currentFindings();
   const total = (REPORT.findings || []).length;
   document.getElementById('result-count').textContent = `showing ${findings.length} of ${total} findings`;
-  renderRows(findings);
-  renderSummaryDashboard();
+  renderFindingsView(findings);
+}
+
+
+function renderFindingsView(findings) {
+  const table = document.getElementById('findings-table');
+  const groupedPanel = document.getElementById('findings-view');
+  if (!table || !groupedPanel) return;
+
+  table.style.display = 'none';
+
+  if (findingsGroupMode === 'flat') {
+    groupedPanel.innerHTML = `<div class="triage-group-results">${renderDefaultFindings(findings)}</div>`;
+    return;
+  }
+
+  groupedPanel.innerHTML = `<div class="triage-group-results">${renderGroupedFindings(findings, findingsGroupMode)}</div>`;
 }
 
 function renderRows(findings) {
@@ -712,6 +801,23 @@ function renderRows(findings) {
     return;
   }
   rows.innerHTML = findings.map(renderRow).join('');
+}
+
+function renderDefaultFindings(findings) {
+  if (!findings.length) return '<div class="empty">No findings match the current filters.</div>';
+  return findings.map(f => {
+    const idx = (REPORT.findings || []).indexOf(f);
+    const selected = selectedIdx === idx ? ' selected' : '';
+    return `<div class="summary-details default-finding-row${selected}" onclick="openDetail(${idx})">
+      <div>${severityBadge(f.severity)}</div>
+      <div>${typeBadge(f.type)}</div>
+      <div>
+        <div class="row-title">${esc(f.title || 'Untitled finding')}</div>
+        <div class="row-cat">${esc(compactEvidence(f) || f.category || '')}</div>
+      </div>
+      <div class="row-res">${esc(compactResource(f.resource))}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderRow(f) {
@@ -733,7 +839,7 @@ function openDetail(idx) {
   const f = REPORT.findings[idx];
   const isSecret = f.type === 'secret';
   const id = f.check_id || f.advisory_id || f.secret_type || '';
-  let html = `<div class="detail-badges">${severityBadge(f.severity)}${typeBadge(f.type)}</div>`;
+  let html = '';
   if (!isSecret) html += `<div class="detail-title">${esc(f.title || 'Untitled finding')}</div>${id ? `<div class="detail-id">${esc(id)}</div>` : ''}`;
   html += `<div class="section"><div class="section-label">Scope</div><div class="code-block">${esc(compactResource(f.resource))}</div></div>`;
   html += `<div class="section"><div class="section-label">Evidence</div><div class="code-block">${esc(compactEvidence(f) || 'No specific evidence provided')}</div></div>`;
@@ -760,12 +866,10 @@ function closeDetail(refresh = true) {
 function renderSummaryDashboard() {
   const panel = document.getElementById('summary-panel');
   if (!panel) return;
-  const findings = currentFindings();
+  const findings = REPORT.findings || [];
   const total = findings.length;
-  const allTotal = (REPORT.findings || []).length;
   const repos = unique(findings.map(repoKey));
-  const severityBaseFindings = findingsIgnoringSeverity();
-  const severityCounts = countBy(severityBaseFindings, f => normalizeSeverity(f.severity));
+  const severityCounts = countBy(findings, f => normalizeSeverity(f.severity));
   const typeCounts = countBy(findings, f => f.type || 'unknown');
   const duplicateGroups = buildGroups(findings, 'finding').filter(g => g.items.length > 1).length;
 
@@ -774,7 +878,7 @@ function renderSummaryDashboard() {
       <div class="summary-card">
         <div class="summary-card-label">Total Findings</div>
         <div class="summary-card-value">${total}</div>
-        <div class="summary-card-sub">${total === allTotal ? 'All findings in this scan' : `Filtered from ${allTotal} total`}</div>
+        <div class="summary-card-sub">All findings in this scan</div>
       </div>
       <div class="summary-card">
         <div class="summary-card-label">Affected Repositories</div>
@@ -788,49 +892,31 @@ function renderSummaryDashboard() {
       </div>
     </div>
     <div class="summary-grid">
-      <div class="summary-panel">
-        <div class="summary-section-label">Severity Distribution</div>
+      <div class="summary-panel" style="text-align:center;">
+        <div class="summary-large-title">Severity Distribution</div>
         <div class="pie-wrap">
           <div class="pie-chart" style="background:${severityConicGradient(severityCounts, total)}"></div>
-          <div class="summary-list">${summaryRows(severityCounts, SEVERITY_ORDER, true, severityBaseFindings.length)}</div>
+          <div class="summary-list">${summaryRows(severityCounts, SEVERITY_ORDER, true, total)}</div>
         </div>
       </div>
-      <div class="summary-panel">
-        <div class="summary-section-label">Finding Type Breakdown</div>
-        <div class="summary-list">${summaryRows(typeCounts, TYPE_ORDER, false, total)}</div>
+      <div class="summary-panel" style="text-align:center;">
+        <div class="summary-large-title">Finding Type Breakdown</div>
+        <div class="summary-list type-summary-list">${summaryRows(typeCounts, TYPE_ORDER, false, total)}</div>
       </div>
     </div>
     <div class="summary-panel">
       <div class="summary-section-head">
         <div>
-          <div class="summary-section-label">Grouped Findings</div>
-        </div>
-        <div class="view-switch" aria-label="Remediation grouping">
-          <button class="view-btn ${summaryGroupMode === 'finding' ? 'active' : ''}" data-summary-mode="finding" data-mode="finding" onclick="setSummaryGroupMode(this)">By issue</button>
-          <button class="view-btn ${summaryGroupMode === 'resource' ? 'active' : ''}" data-summary-mode="resource" data-mode="resource" onclick="setSummaryGroupMode(this)">By repo</button>
-          <button class="view-btn ${summaryGroupMode === 'flat' ? 'active' : ''}" data-summary-mode="flat" data-mode="flat" onclick="setSummaryGroupMode(this)">No group</button>
+          <div class="summary-section-label">Top 3 Actions</div>
+          <div class="summary-section-subtitle">Most important actions based on recurring and high-priority findings.</div>
         </div>
       </div>
-      <div class="triage-group-results">${renderSummaryGroups(findings, summaryGroupMode)}</div>
+      ${renderTopActions(findings)}
     </div>`;
 }
 
-function renderSummaryGroups(findings, mode) {
+function renderGroupedFindings(findings, mode) {
   if (!findings.length) return '<div class="summary-details-body">No findings match the current filters.</div>';
-  if (mode === 'flat') {
-    return findings.slice(0, 180).map(f => {
-      const label = `${normalizeSeverity(f.severity)} · ${typeLabel(f.type)}`;
-      return `<details class="summary-details">
-        <summary><span>${esc(f.title || 'Untitled finding')}</span><span>${esc(label)}</span></summary>
-        <div class="summary-details-body">
-          <div class="group-body-grid">
-            <div><div class="group-field-label">Repository</div><div class="group-muted">${esc(compactResource(f.resource))}</div></div>
-            <div><div class="group-field-label">Evidence Preview</div><div class="group-muted">${esc(compactEvidence(f) || 'No specific evidence provided')}</div></div>
-          </div>
-        </div>
-      </details>`;
-    }).join('');
-  }
   const groups = buildGroups(findings, mode).slice(0, 160);
   return groups.map((group, groupIndex) => {
     const resources = unique(group.items.map(repoKey));
@@ -838,31 +924,92 @@ function renderSummaryGroups(findings, mode) {
     const type = dominantType(group.items);
     const uniqueIssues = unique(group.items.map(findingKey)).length;
     const repeats = Math.max(0, group.items.length - uniqueIssues);
-    const evidenceAll = unique(group.items.map(compactEvidence).filter(Boolean));
-    const evidencePreview = evidenceAll.slice(0, 6);
-    const packagesAll = unique(group.items.map(packageText).filter(Boolean));
-    const packagesPreview = packagesAll.slice(0, 3);
     const title = mode === 'resource' ? compactResource(group.title) : group.title;
     const subtitle = mode === 'resource'
       ? `${group.items.length} total findings · ${uniqueIssues} unique issues · ${repeats} repeats grouped`
       : `${resources.length} repositories/resources · ${group.items.length} total findings · ${repeats} repeats grouped`;
-    const evidenceNote = `Showing ${Math.min(evidencePreview.length || 0, 6)} evidence examples from ${group.items.length} total findings.`;
     const groupId = `group-${mode}-${groupIndex}`;
-    const showAllButton = group.items.length > evidencePreview.length
-      ? `<button class="show-all-btn" type="button" onclick="toggleGroupFindings(event, '${groupId}')">Show all findings</button><div class="group-all-findings" id="${groupId}" hidden>${renderDetailedFindingList(group.items)}</div>`
+    const previewRows = `<div id="${groupId}-preview">${renderFindingPreviewRows(group.items, 5, true)}</div>`;
+    const showAllButton = group.items.length > 5
+      ? `<button class="show-all-btn" type="button" onclick="toggleGroupFindings(event, '${groupId}')">Show all findings</button><div class="group-all-findings" id="${groupId}-all" hidden>${renderFindingPreviewRows(group.items, group.items.length, true)}</div>`
       : '';
     return `<details class="summary-details">
-      <summary><span>${esc(title)}</span><span>${clickableSeverityText(severity)} · ${group.items.length} total · ${esc(typeLabel(type))}</span></summary>
+      <summary><span>${esc(title)}</span><span>${esc(severity)} · ${group.items.length} total · ${esc(typeLabel(type))}</span></summary>
       <div class="summary-details-body">
         <div class="group-muted">${esc(subtitle)}</div>
         <div class="summary-line"></div>
-        <div class="group-body-grid">
-          <div><div class="group-field-label">Repositories</div>${renderList(resources.map(compactResource).slice(0, 14))}</div>
-          <div><div class="group-field-label">Evidence Preview</div><div class="group-preview-note">${esc(evidenceNote)}</div>${packagesPreview.length ? `<div class="group-muted" style="margin-bottom:10px">${esc(packagesPreview.join(' · '))}</div>` : ''}${renderList(evidencePreview)}${showAllButton}</div>
-        </div>
+        <div class="group-preview-table">${previewRows}</div>
+        ${showAllButton}
       </div>
     </details>`;
   }).join('');
+}
+
+
+function renderFindingPreviewRows(items, limit = 5, includeHeaders = false) {
+  const preview = (items || []).slice(0, limit);
+  const head = includeHeaders ? '<div class="group-preview-head"><div>Repository / Resource</div><div>Evidence / Finding</div></div>' : '';
+  if (!preview.length) return `${head}<div class="group-preview-row"><div class="group-preview-repo">No resource</div><div class="group-preview-evidence">No specific evidence provided.</div></div>`;
+  return `${head}${preview.map(f => `<div class="group-preview-row">
+    <div class="group-preview-repo">${esc(compactResource(f.resource))}</div>
+    <div class="group-preview-evidence">${esc(compactEvidence(f) || f.title || 'No specific evidence provided')}</div>
+  </div>`).join('')}`;
+}
+
+function renderTopActions(findings) {
+  const groups = buildGroups(findings || [], 'finding')
+    .filter(group => group.items.length)
+    .sort((a, b) => {
+      const severityDiff = severityRank(highestSeverity(a.items)) - severityRank(highestSeverity(b.items));
+      return severityDiff || b.items.length - a.items.length || a.title.localeCompare(b.title);
+    })
+    .slice(0, 3);
+
+  if (!groups.length) return '<div class="group-muted">No recommended actions available.</div>';
+
+  return `<div class="top-actions-grid">${groups.map((group, index) => {
+    const first = group.items[0] || {};
+    const resources = unique(group.items.map(repoKey)).map(compactResource);
+    const remediation = first.remediation || defaultActionText(first);
+    const actionId = `action-findings-${index}`;
+    const showAllButton = group.items.length > 5
+      ? `<button class="show-all-btn" type="button" onclick="toggleActionFindings(event, '${actionId}')">Show all findings</button>
+         <div class="group-all-findings" id="${actionId}-all" hidden>
+           <div class="group-preview-table">${renderFindingPreviewRows(group.items, group.items.length, true)}</div>
+         </div>`
+      : '';
+
+    return `<details class="action-card">
+      <summary><span class="action-card-title">${esc(group.title || first.title || 'Recommended action')}</span><span class="action-card-meta">${group.items.length} findings · ${resources.length} affected resources</span></summary>
+      <div class="action-card-body">${esc(remediation)}</div>
+      <div style="padding:0 16px 16px;">
+        <div class="group-preview-table" id="${actionId}-preview">${renderFindingPreviewRows(group.items, 5, true)}</div>
+        ${showAllButton}
+      </div>
+    </details>`;
+  }).join('')}</div>`;
+}
+
+function toggleActionFindings(event, actionId) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const preview = document.getElementById(`${actionId}-preview`);
+  const full = document.getElementById(`${actionId}-all`);
+  if (!preview || !full) return;
+  const shouldShow = full.hidden;
+  full.hidden = !shouldShow;
+  preview.hidden = shouldShow;
+  const button = event?.currentTarget;
+  if (button) button.textContent = shouldShow ? 'Show preview only' : 'Show all findings';
+}
+
+function defaultActionText(f) {
+  if (!f) return 'Review and remediate the affected finding.';
+  if (f.type === 'secret') return 'Rotate exposed credentials and remove them from repository history.';
+  if (f.type === 'dependency') return 'Update the affected dependency to a patched version.';
+  return 'Review the affected security check and apply the recommended remediation.';
 }
 
 function buildGroups(findings, mode) {
@@ -877,30 +1024,17 @@ function renderList(items) {
   return `<ul class="summary-mini-list">${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>`;
 }
 
-function renderDetailedFindingList(items) {
-  const grouped = Object.values(groupBy(items || [], detailedFindingKey))
-    .map(group => ({item: group[0], count: group.length}))
-    .sort((a, b) => severityRank(a.item.severity) - severityRank(b.item.severity) || (a.item.title || '').localeCompare(b.item.title || ''));
-
-  return grouped.map(({item: f, count}) => {
-    const repeatText = count > 1 ? ` · ${count} occurrences` : '';
-    return `<div class="group-finding-item">
-      <div class="group-finding-title">${esc(f.title || 'Untitled finding')}</div>
-      <div class="group-finding-meta">${esc(normalizeSeverity(f.severity))} · ${esc(typeLabel(f.type))} · ${esc(compactResource(f.resource))}${esc(repeatText)}</div>
-      <div class="group-finding-meta">${esc(compactEvidence(f) || 'No specific evidence provided')}</div>
-    </div>`;
-  }).join('');
-}
-
 function toggleGroupFindings(event, groupId) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
-  const panel = document.getElementById(groupId);
-  if (!panel) return;
-  const shouldShow = panel.hidden;
-  panel.hidden = !shouldShow;
+  const preview = document.getElementById(`${groupId}-preview`);
+  const full = document.getElementById(`${groupId}-all`);
+  if (!preview || !full) return;
+  const shouldShow = full.hidden;
+  full.hidden = !shouldShow;
+  preview.hidden = shouldShow;
   const button = event?.currentTarget;
   if (button) button.textContent = shouldShow ? 'Show preview only' : 'Show all findings';
 }
@@ -913,9 +1047,12 @@ function summaryRows(counts, order, isSeverity, total) {
   return entries.map(([key, count]) => {
     const label = isSeverity ? key : typeLabel(key);
     const color = isSeverity ? (SEVERITY_COLORS[key] || SEVERITY_COLORS.Unknown) : '#8DD6C4';
-    const labelHtml = isSeverity ? clickableSeverityText(key) : esc(label);
+    const labelHtml = esc(label);
     const percent = total ? ((count / total) * 100).toFixed(1) : '0.0';
-    return `<div class="summary-row"><span class="legend-dot" style="background:${color}"></span><span>${labelHtml}</span><span class="summary-percent">${percent}%</span><span class="summary-count">${count}</span></div>`;
+    if (isSeverity) {
+      return `<div class="summary-row severity-row"><span class="legend-dot" style="background:${color}"></span><span class="summary-label">${labelHtml}</span><span class="summary-percent">${percent}%</span><span class="summary-count">${count}</span></div>`;
+    }
+    return `<div class="summary-row type-row"><span class="legend-spacer"></span><span class="summary-label">${labelHtml}</span><span class="summary-percent">${percent}%</span><span class="summary-count">${count}</span></div>`;
   }).join('');
 }
 
@@ -987,6 +1124,12 @@ function severityBadge(severity) {
   const sev = normalizeSeverity(severity);
   return `<span class="sev-badge clickable sev-${esc(sev)}" role="button" title="Filter by ${esc(sev)} severity. Click again to reset." onclick="filterBySeverity(event, '${esc(sev)}')"><span class="dot" style="background:${SEVERITY_COLORS[sev] || SEVERITY_COLORS.Unknown}"></span>${esc(sev)}</span>`;
 }
+
+function severityBadgeStatic(severity) {
+  const sev = normalizeSeverity(severity);
+  return `<span class="sev-badge sev-${esc(sev)}"><span class="dot" style="background:${SEVERITY_COLORS[sev] || SEVERITY_COLORS.Unknown}"></span>${esc(sev)}</span>`;
+}
+
 function clickableSeverityText(severity) {
   const sev = normalizeSeverity(severity);
   return `<span class="severity-link" role="button" title="Filter by ${esc(sev)} severity. Click again to reset." onclick="filterBySeverity(event, '${esc(sev)}')">${esc(sev)}</span>`;
@@ -998,6 +1141,16 @@ function groupBy(items, keyFn) { return (items || []).reduce((acc, item) => { co
 function countBy(items, keyFn) { return (items || []).reduce((acc, item) => { const key = keyFn(item) || 'Unknown'; acc[key] = (acc[key] || 0) + 1; return acc; }, {}); }
 function unique(items) { return [...new Set((items || []).filter(Boolean))]; }
 function sortByOrder(a, b, order) { const ai = order.indexOf(a); const bi = order.indexOf(b); return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b); }
+
+function scannedTarget() {
+  const resources = unique((REPORT.findings || []).map(repoKey).filter(Boolean));
+  if (!resources.length) return 'Unknown';
+  if (resources.length === 1) return compactResource(resources[0]);
+  const orgs = unique(resources.map(resource => compactResource(resource).split('/')[0]).filter(Boolean));
+  if (orgs.length === 1) return orgs[0];
+  return `${resources.length} resources`;
+}
+
 function escapeRegex(value) { return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function esc(value) { if (value === null || value === undefined) return ''; return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 </script>

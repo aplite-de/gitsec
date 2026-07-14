@@ -846,7 +846,6 @@ function openDetail(idx) {
   if (f.risk) html += `<div class="section"><div class="section-label">Risk</div><div class="risk-block">${esc(f.risk)}</div></div>`;
   if (f.type === 'dependency') {
     if (f.package || f.version || f.ecosystem) html += `<div class="section"><div class="section-label">Package</div><div class="code-block">${esc(packageText(f))}</div></div>`;
-    if (f.cvss_score !== undefined && String(f.cvss_score) !== '') html += `<div class="section"><div class="section-label">CVSS</div><div class="code-block">${esc(String(f.cvss_score))}</div></div>`;
   }
   if (isSecret) html += `<div class="section"><div class="section-label">Immediate action</div><div class="warn-block">Rotate the credential immediately and remove it from repository history.</div></div>`;
   if (f.reference_url) html += `<div class="section"><div class="section-label">Reference</div><a href="${esc(f.reference_url)}" target="_blank" rel="noopener noreferrer">${esc(f.reference_url)}</a></div>`;

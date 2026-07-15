@@ -12,8 +12,9 @@ SECRET_REMEDIATION = "Rotate this credential immediately. Remove it from reposit
 
 
 class HtmlReportWriter:
-    def __init__(self, output_path: Path):
+    def __init__(self, output_path: Path, target: Optional[str] = None):
         self.output_path = output_path
+        self._target = _safe_text(target)
         self._security_findings: List[Finding] = []
         self._dependency_findings: List[DependencyFinding] = []
         self._deprecated_dependencies: List[dict] = []
@@ -48,7 +49,27 @@ class HtmlReportWriter:
         findings.extend(self._serialize_dependency_findings())
         findings.extend(self._serialize_secret_findings())
         findings.sort(key=lambda item: SEVERITY_ORDER.get(item.get("severity", DEFAULT_SEVERITY), 5))
-        return {"findings": findings, "summary": _build_summary(findings)}
+        return {
+            "findings": findings,
+            "summary": _build_summary(findings),
+            "target": self._report_target(findings),
+        }
+
+    def _report_target(self, findings: List[dict]) -> str:
+        if self._target:
+            return self._target
+
+        resources = sorted({_safe_text(item.get("resource")) for item in findings if item.get("resource")})
+        resources = [resource.replace("repo/", "") for resource in resources if resource]
+
+        if len(resources) == 1:
+            return resources[0]
+
+        orgs = sorted({resource.split("/", 1)[0] for resource in resources if "/" in resource})
+        if len(orgs) == 1:
+            return orgs[0]
+
+        return f"{len(resources)} resources" if resources else "Unknown"
 
     def _serialize_security_findings(self) -> List[dict]:
         return [
@@ -493,6 +514,12 @@ HTML_TEMPLATE = r'''
     font-weight: 800;
   }
   .summary-details summary::-webkit-details-marker { display: none; }
+  .group-summary-title { display: grid; gap: 5px; min-width: 0; }
+  .group-summary-meta { display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .group-summary-meta .sev-badge { min-width: auto; height: 26px; padding: 0 9px; font-size: 11px; }
+  .group-description { color: rgba(234,245,240,.86); margin-top: 8px; font-weight: 500; }
+  .group-summary-title .group-description { margin-top: 0; font-size: 13px; line-height: 1.45; color: rgba(234,245,240,.72); }
+  .group-summary-title .group-description strong { color: rgba(234,245,240,.82); }
   .summary-details-body { border-top: 1px solid rgba(141,214,196,.14); padding: 13px 16px; color: #8DD6C4; font-size: 13px; line-height: 1.55; }
   .summary-line { height: 1px; background: rgba(141,214,196,.14); margin: 10px 0; }
   .group-body-grid { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(260px,1.2fr); gap: 18px; }
@@ -553,7 +580,10 @@ HTML_TEMPLATE = r'''
   }
   .action-card summary::-webkit-details-marker { display: none; }
   .action-card-title { color: #F4FFFA; font-size: 15px; font-weight: 800; line-height: 1.35; }
-  .action-card-meta { color: #F4FFFA; font-size: 14px; font-weight: 800; line-height: 1.35; text-align: right; white-space: nowrap; }
+  .action-summary-title { display: grid; gap: 5px; min-width: 0; }
+  .action-description { color: rgba(234,245,240,.78); font-size: 13px; font-weight: 500; line-height: 1.45; }
+  .action-card-meta { color: #F4FFFA; font-size: 14px; font-weight: 800; line-height: 1.35; text-align: right; white-space: nowrap; display: inline-flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  .action-card-meta .sev-badge { min-width: auto; height: 26px; padding: 0 9px; font-size: 11px; }
   .action-card-body { border-top: 1px solid rgba(141,214,196,.14); color: rgba(234,245,240,.84); font-size: 13px; line-height: 1.5; padding: 13px 16px; }
   .action-resources { margin-top: 12px; display: grid; gap: 7px; }
   .action-resources[hidden] { display: none; }
@@ -651,9 +681,9 @@ HTML_TEMPLATE = r'''
         <div class="summary-section-head">
           <div class="summary-section-label">Grouped Findings</div>
           <div class="view-switch" aria-label="Findings grouping">
-            <button class="view-btn" data-findings-mode="finding" data-mode="finding" onclick="setFindingsGroupMode(this)">By issue</button>
+            <button class="view-btn active" data-findings-mode="finding" data-mode="finding" onclick="setFindingsGroupMode(this)">By issue</button>
             <button class="view-btn" data-findings-mode="resource" data-mode="resource" onclick="setFindingsGroupMode(this)">By repo</button>
-            <button class="view-btn active" data-findings-mode="flat" data-mode="flat" onclick="setFindingsGroupMode(this)">Default</button>
+            <button class="view-btn" data-findings-mode="flat" data-mode="flat" onclick="setFindingsGroupMode(this)">Default</button>
           </div>
         </div>
         <div id="findings-view"></div>
@@ -682,7 +712,7 @@ const TYPE_ORDER = ['check', 'dependency', 'secret', 'unknown'];
 const SEVERITY_COLORS = {Critical:'#E94B4B', High:'#F08A24', Medium:'#E0BE42', Low:'#4C93F0', Unknown:'#9CA3AF'};
 let activeSev = 'All';
 let activeType = 'All';
-let findingsGroupMode = 'flat';
+let findingsGroupMode = 'finding';
 let selectedIdx = null;
 
 function initializeReport() {
@@ -907,7 +937,7 @@ function renderSummaryDashboard() {
       <div class="summary-section-head">
         <div>
           <div class="summary-section-label">Top 3 Actions</div>
-          <div class="summary-section-subtitle">Most important actions based on recurring and high-priority findings.</div>
+          <div class="summary-section-subtitle">Most important actions based on recurring and high-priority security checks.</div>
         </div>
       </div>
       ${renderTopActions(findings)}
@@ -923,7 +953,8 @@ function renderGroupedFindings(findings, mode) {
     const type = dominantType(group.items);
     const uniqueIssues = unique(group.items.map(findingKey)).length;
     const repeats = Math.max(0, group.items.length - uniqueIssues);
-    const title = mode === 'resource' ? compactResource(group.title) : group.title;
+    const title = groupDisplayTitle(group, mode);
+    const description = groupDescription(group, mode);
     const subtitle = mode === 'resource'
       ? `${group.items.length} total findings · ${uniqueIssues} unique issues · ${repeats} repeats grouped`
       : `${resources.length} repositories/resources · ${group.items.length} total findings · ${repeats} repeats grouped`;
@@ -933,7 +964,13 @@ function renderGroupedFindings(findings, mode) {
       ? `<button class="show-all-btn" type="button" onclick="toggleGroupFindings(event, '${groupId}')">Show all findings</button><div class="group-all-findings" id="${groupId}-all" hidden>${renderFindingPreviewRows(group.items, group.items.length, true)}</div>`
       : '';
     return `<details class="summary-details">
-      <summary><span>${esc(title)}</span><span>${esc(severity)} · ${group.items.length} total · ${esc(typeLabel(type))}</span></summary>
+      <summary>
+        <span class="group-summary-title">
+          <span>${esc(title)}</span>
+          ${description ? `<span class="group-description"><strong>Description:</strong> ${esc(description)}</span>` : ''}
+        </span>
+        <span class="group-summary-meta">${severityBadgeStatic(severity)}<span>${group.items.length} total · ${esc(typeLabel(type))}</span></span>
+      </summary>
       <div class="summary-details-body">
         <div class="group-muted">${esc(subtitle)}</div>
         <div class="summary-line"></div>
@@ -942,6 +979,47 @@ function renderGroupedFindings(findings, mode) {
       </div>
     </details>`;
   }).join('');
+}
+
+function groupDisplayTitle(group, mode) {
+  if (mode === 'resource') return compactResource(group.title);
+  const first = (group.items || [])[0] || {};
+  if (first.type === 'check') return checkTitle(first);
+  return group.title;
+}
+
+function groupDescription(group, mode) {
+  if (mode === 'resource') return '';
+  const first = (group.items || [])[0] || {};
+  if (first.type !== 'check') return '';
+  return checkDescription(first);
+}
+
+function checkTitle(f) {
+  return f.title || labelize(f.check_id || 'Check finding');
+}
+
+function checkDescription(f) {
+  if (f.description) return f.description;
+  const descriptions = {
+    'org-mfa': 'Multi-factor authentication is not enforced for all organization members.',
+    'org-sso': 'Single sign-on is not enforced for the organization.',
+    'org-default-repo-permission': 'The organization default repository permission may allow broader access than needed.',
+    'org-members-can-create-repos': 'Organization members are allowed to create repositories.',
+    'org-commit-signing': 'Commit signature verification is not required across relevant organization repositories.',
+    'org-pr-required': 'Pull request review requirements are not enforced across relevant organization repositories.',
+    'org-push-protection': 'Secret scanning push protection is not enforced across relevant organization repositories.',
+    'org-tag-deletion-protection': 'Tags are not protected from deletion across relevant organization repositories.',
+    'org-secrets-scope': 'Organization secrets may be available to a broad set of repositories.',
+    'org-runners-scope': 'Organization runners may be available to a broad set of repositories.',
+    'org-user-access': 'User access should be reviewed for least privilege.',
+    'repo-commit-signing': 'The repository does not require commit signature verification.',
+    'repo-pr-required': 'The repository does not require pull request reviews before changes are merged.',
+    'repo-push-protection': 'The repository does not enforce secret scanning push protection.',
+    'repo-tag-deletion-protection': 'The repository does not protect tags from deletion.',
+    'repo-runners-scope': 'Repository runner access should be reviewed for least privilege.'
+  };
+  return descriptions[f.check_id] || 'Review this security check and apply the recommended remediation.';
 }
 
 
@@ -956,7 +1034,8 @@ function renderFindingPreviewRows(items, limit = 5, includeHeaders = false) {
 }
 
 function renderTopActions(findings) {
-  const groups = buildGroups(findings || [], 'finding')
+  const checkFindings = (findings || []).filter(f => f.type === 'check');
+  const groups = buildGroups(checkFindings, 'finding')
     .filter(group => group.items.length)
     .sort((a, b) => {
       const severityDiff = severityRank(highestSeverity(a.items)) - severityRank(highestSeverity(b.items));
@@ -964,12 +1043,14 @@ function renderTopActions(findings) {
     })
     .slice(0, 3);
 
-  if (!groups.length) return '<div class="group-muted">No recommended actions available.</div>';
+  if (!groups.length) return '<div class="group-muted">No recommended check actions available.</div>';
 
   return `<div class="top-actions-grid">${groups.map((group, index) => {
     const first = group.items[0] || {};
     const resources = unique(group.items.map(repoKey)).map(compactResource);
     const remediation = first.remediation || defaultActionText(first);
+    const severity = highestSeverity(group.items);
+    const description = groupDescription(group, 'finding') || first.description || '';
     const actionId = `action-findings-${index}`;
     const showAllButton = group.items.length > 5
       ? `<button class="show-all-btn" type="button" onclick="toggleActionFindings(event, '${actionId}')">Show all findings</button>
@@ -979,7 +1060,13 @@ function renderTopActions(findings) {
       : '';
 
     return `<details class="action-card">
-      <summary><span class="action-card-title">${esc(group.title || first.title || 'Recommended action')}</span><span class="action-card-meta">${group.items.length} findings · ${resources.length} affected resources</span></summary>
+      <summary>
+        <span class="action-summary-title">
+          <span class="action-card-title">${esc(groupDisplayTitle(group, 'finding'))}</span>
+          ${description ? `<span class="action-description">Description: ${esc(description)}</span>` : ''}
+        </span>
+        <span class="action-card-meta">${severityBadgeStatic(severity)}<span>${group.items.length} findings · ${resources.length} affected resources</span></span>
+      </summary>
       <div class="action-card-body">${esc(remediation)}</div>
       <div style="padding:0 16px 16px;">
         <div class="group-preview-table" id="${actionId}-preview">${renderFindingPreviewRows(group.items, 5, true)}</div>
@@ -1076,7 +1163,7 @@ function findingKey(f) {
     return [pkg, title, eco].filter(Boolean).join(' · ');
   }
   if (f.type === 'secret') return f.secret_type || f.title || 'Secret finding';
-  return f.check_id || f.title || 'Check finding';
+  return checkTitle(f);
 }
 
 function normalizeTitle(value) {
@@ -1142,6 +1229,7 @@ function unique(items) { return [...new Set((items || []).filter(Boolean))]; }
 function sortByOrder(a, b, order) { const ai = order.indexOf(a); const bi = order.indexOf(b); return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi) || a.localeCompare(b); }
 
 function scannedTarget() {
+  if (REPORT.target && String(REPORT.target).trim()) return String(REPORT.target).trim();
   const resources = unique((REPORT.findings || []).map(repoKey).filter(Boolean));
   if (!resources.length) return 'Unknown';
   if (resources.length === 1) return compactResource(resources[0]);

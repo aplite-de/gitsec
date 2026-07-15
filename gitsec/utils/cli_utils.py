@@ -1,7 +1,7 @@
 import csv
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 
@@ -87,7 +87,11 @@ def print_summary(rows: List[Finding]) -> None:
 
 
 def write_outputs(
-    findings: List[Finding], base_filename: str, output_folder: Path, formats: List[str]
+    findings: List[Finding],
+    base_filename: str,
+    output_folder: Path,
+    formats: List[str],
+    target: Optional[str] = None,
 ) -> List[str]:
     output_paths = []
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -99,7 +103,7 @@ def write_outputs(
 
     if "html" in formats:
         html_path = output_folder / f"{base_filename}.html"
-        writer = HtmlReportWriter(html_path)
+        writer = HtmlReportWriter(html_path, target=target or base_filename)
         writer.add_security_findings(findings)
         writer.save()
         output_paths.append(str(html_path))

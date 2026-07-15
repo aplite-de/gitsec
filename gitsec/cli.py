@@ -181,12 +181,15 @@ def security_checks(
         print_summary(all_findings)
 
         base_name = "security_checks"
+        target_name = org or repo or base_name
         if org:
             base_name = f"security_checks_{org}"
         elif repo:
             base_name = f"security_checks_{repo.replace('/', '_')}"
 
-        output_paths = write_outputs(all_findings, base_name, output_dir, formats)
+        output_paths = write_outputs(
+            all_findings, base_name, output_dir, formats, target=target_name
+        )
         typer.echo("\nResults written to:")
         for path in output_paths:
             typer.echo(f"  - {path}")
@@ -385,9 +388,11 @@ def scan_dependencies(
                 writer.writerows(unpinned_list)
             output_paths.append(str(unpinned_path))
 
+    target_name = org or repo or (Path(local_repo).name if local_repo else base_name)
+
     if "html" in formats:
         html_path = output_dir / f"{base_name}.html"
-        html_writer = HtmlReportWriter(html_path)
+        html_writer = HtmlReportWriter(html_path, target=target_name)
         html_writer.add_dependency_findings(
             vuln_findings, deprecated_list, unpinned_list
         )
@@ -494,9 +499,11 @@ def scan_secrets(
             format_secret_findings(secret_findings, csv_path)
             output_paths.append(str(csv_path))
 
+        target_name = org or repo or (Path(local_repo).name if local_repo else base_name)
+
         if "html" in formats:
             html_path = output_dir / f"{base_name}.html"
-            writer = HtmlReportWriter(html_path)
+            writer = HtmlReportWriter(html_path, target=target_name)
             writer.add_secret_findings(secret_findings)
             writer.save()
             output_paths.append(str(html_path))
@@ -616,11 +623,13 @@ def audit_all(
         target_name = org
         target_type = "org"
     elif repo:
-        target_name = repo.replace("/", "_")
+        target_name = repo
         target_type = "repo"
     else:
         target_name = Path(local_repo or ".").name
         target_type = "local-repo"
+
+    file_target = target_name.replace("/", "_")
 
     typer.echo(f"\n{'='*60}")
     typer.echo(f"Starting comprehensive audit for {target_type}: {target_name}")
@@ -989,8 +998,8 @@ def audit_all(
     security_check_errors = [f for f in security_findings if f.is_error]
 
     if "html" in formats:
-        html_path = output_dir / f"audit_all_{target_name}.html"
-        writer = HtmlReportWriter(html_path)
+        html_path = output_dir / f"audit_all_{file_target}.html"
+        writer = HtmlReportWriter(html_path, target=target_name)
 
         if actual_security_findings:
             writer.add_security_findings(actual_security_findings)
@@ -1009,7 +1018,7 @@ def audit_all(
         output_paths.append(str(html_path))
 
     if "sarif" in formats:
-        sarif_path = output_dir / f"audit_all_{target_name}.sarif"
+        sarif_path = output_dir / f"audit_all_{file_target}.sarif"
         sarif_writer = SarifReportWriter(sarif_path)
 
         if actual_security_findings:

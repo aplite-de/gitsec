@@ -475,6 +475,12 @@ HTML_TEMPLATE = r'''
   .summary-section-subtitle { color: #8DD6C4; font-size: 13px; margin-top: 2px; }
   .summary-list { display: grid; gap: 12px; width: min(100%, 460px); margin: 0 auto; }
   .type-summary-list { margin-top: 78px; }
+  .type-breakdown-list { display: grid; gap: 16px; width: calc(100% - 192px); max-width: 620px; margin: 42px auto 0; }
+  .type-breakdown-item { display: grid; gap: 6px; text-align: left; }
+  .type-breakdown-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-bottom: 6px; border-bottom: 1px solid rgba(141,214,196,.16); }
+  .type-breakdown-title { color: #F4FFFA; font-size: 16px; font-weight: 800; }
+  .type-breakdown-value { color: #FFFFFF; font-size: 15px; font-weight: 800; white-space: nowrap; }
+  .type-breakdown-desc { color: rgba(234,245,240,.68); font-size: 13px; line-height: 1.45; }
   .summary-row { display: grid; align-items: center; gap: 12px; font-size: 18px; }
   .summary-row.severity-row,
   .summary-row.type-row { grid-template-columns: 14px minmax(150px, 210px) 70px 38px; justify-content: center; text-align: left; }
@@ -915,9 +921,9 @@ function renderSummaryDashboard() {
         <div class="summary-card-sub">Unique repositories/resources</div>
       </div>
       <div class="summary-card">
-        <div class="summary-card-label">Duplicate Findings</div>
+        <div class="summary-card-label">Recurring Issues</div>
         <div class="summary-card-value">${duplicateGroups}</div>
-        <div class="summary-card-sub">Same check/finding appearing more than once</div>
+        <div class="summary-card-sub">Similar findings where one remediation may reduce multiple occurrences</div>
       </div>
     </div>
     <div class="summary-grid">
@@ -930,13 +936,13 @@ function renderSummaryDashboard() {
       </div>
       <div class="summary-panel" style="text-align:center;">
         <div class="summary-large-title">Finding Type Breakdown</div>
-        <div class="summary-list type-summary-list">${summaryRows(typeCounts, TYPE_ORDER, false, total)}</div>
+        ${typeBreakdownRows(typeCounts, total)}
       </div>
     </div>
     <div class="summary-panel">
       <div class="summary-section-head">
         <div>
-          <div class="summary-section-label">Top 3 Actions</div>
+          <div class="summary-section-label">Top 3 Findings</div>
           <div class="summary-section-subtitle">Most important actions based on recurring and high-priority security checks.</div>
         </div>
       </div>
@@ -1123,6 +1129,46 @@ function toggleGroupFindings(event, groupId) {
   preview.hidden = shouldShow;
   const button = event?.currentTarget;
   if (button) button.textContent = shouldShow ? 'Show preview only' : 'Show all findings';
+}
+
+function typeBreakdownRows(counts, total) {
+  const details = {
+    check: {
+      label: '🛡 Checks',
+      description: 'Repository and organization security posture checks'
+    },
+    dependency: {
+      label: '📦 Dependencies',
+      description: 'Vulnerable packages or dependency risks detected'
+    },
+    secret: {
+      label: '🔑 Secrets',
+      description: 'Possible exposed credentials or sensitive values'
+    }
+  };
+
+  const entries = TYPE_ORDER
+    .filter(type => type !== 'unknown')
+    .map(type => [type, counts[type] || 0])
+    .filter(([, count]) => count > 0);
+
+  if (!entries.length) return '<div class="group-muted">No finding types available.</div>';
+
+  return `<div class="type-breakdown-list">${entries.map(([type, count]) => {
+    const item = details[type] || {
+      label: typeLabel(type),
+      description: 'Other finding type'
+    };
+    const percent = total ? ((count / total) * 100).toFixed(1) : '0.0';
+
+    return `<div class="type-breakdown-item">
+      <div class="type-breakdown-head">
+        <div class="type-breakdown-title">${esc(item.label)}</div>
+        <div class="type-breakdown-value">${count} findings · ${percent}%</div>
+      </div>
+      <div class="type-breakdown-desc">${esc(item.description)}</div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 function summaryRows(counts, order, isSeverity, total) {

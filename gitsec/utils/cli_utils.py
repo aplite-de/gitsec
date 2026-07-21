@@ -1,12 +1,12 @@
 import csv
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 
 from ..models import Finding
-from ..output import ExcelReportWriter, format_security_check_results
+from ..output import HtmlReportWriter, SarifReportWriter, format_security_check_results
 
 
 def get_token_or_exit(cli_token: str | None) -> str:
@@ -87,7 +87,11 @@ def print_summary(rows: List[Finding]) -> None:
 
 
 def write_outputs(
-    findings: List[Finding], base_filename: str, output_folder: Path, formats: List[str]
+    findings: List[Finding],
+    base_filename: str,
+    output_folder: Path,
+    formats: List[str],
+    target: Optional[str] = None,
 ) -> List[str]:
     output_paths = []
     output_folder.mkdir(parents=True, exist_ok=True)
@@ -97,19 +101,18 @@ def write_outputs(
         format_security_check_results(findings, csv_path)
         output_paths.append(str(csv_path))
 
-    if "xls" in formats:
-        xls_path = output_folder / f"{base_filename}.xlsx"
-        writer = ExcelReportWriter(xls_path)
-
-        parts = base_filename.split("_")
-        if len(parts) >= 3 and parts[0] == "security" and parts[1] == "checks":
-            repo_name = parts[-1]
-            sheet_name = f"sec_checks_{repo_name}"
-        else:
-            sheet_name = base_filename
-        writer.add_security_findings(findings, sheet_name=sheet_name)
-        writer.add_summary_sheet(security_findings=findings)
+    if "html" in formats:
+        html_path = output_folder / f"{base_filename}.html"
+        writer = HtmlReportWriter(html_path, target=target or base_filename)
+        writer.add_security_findings(findings)
         writer.save()
-        output_paths.append(str(xls_path))
+        output_paths.append(str(html_path))
+
+    if "sarif" in formats:
+        sarif_path = output_folder / f"{base_filename}.sarif"
+        writer = SarifReportWriter(sarif_path)
+        writer.add_security_findings(findings)
+        writer.save()
+        output_paths.append(str(sarif_path))
 
     return output_paths
